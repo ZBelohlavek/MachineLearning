@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a computer sees an edge · Learn ML by Building</title>
+<meta name="description" content="Slide a 3×3 kernel across an image by hand, watch every multiplication, and discover why edge detectors fall out of simple arithmetic.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  #conv-in, #conv-out, .bank-canvas, #pool-in, #pool-out {
+    image-rendering: pixelated; border-radius: 8px; border: 1px solid var(--line); background: #000;
+  }
+  #conv-in { cursor: crosshair; }
+  #kernel-editor { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 230px; }
+  #kernel-editor input { width: 100%; text-align: center; font-family: var(--mono); padding: 9px 4px; }
+  .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .mcell {
+    display: flex; align-items: center; gap: 5px; justify-content: center;
+    background: var(--bg-soft); border: 1px solid var(--line-soft); border-radius: 7px;
+    padding: 7px 4px; font-family: var(--mono); font-size: .72rem; color: var(--text-dim);
+  }
+  .mcell .pix { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line); }
+  .mcell .mk.pos { color: var(--good); } .mcell .mk.neg { color: var(--bad); }
+  .mcell .mres { color: var(--text); }
+  .mcell .mop { color: var(--text-mute); }
+  .msum { margin-top: 12px; font-family: var(--mono); font-size: .86rem; color: var(--text-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .msum b { color: var(--accent); }
+  .msum .swatch { width: 20px; height: 20px; border-radius: 5px; border: 1px solid var(--line); display: inline-block; }
+  #filter-bank { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 12px; }
+  .bank-item { text-align: center; }
+  .bank-label { font-family: var(--mono); font-size: .73rem; color: var(--text-mute); margin-top: 5px; }
+  .pool-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .pool-arrow { color: var(--text-mute); font-size: 1.4rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Computer vision · foundations</div>
+    <h1>How a computer sees an edge</h1>
+    <p class="lead">
+      A vision model doesn't see a cat. It sees a grid of brightness numbers. Everything it eventually
+      knows is built out of one absurdly simple operation repeated millions of times: multiply a small
+      patch of those numbers by a small grid of weights and add them up. Do it here, one pixel at a
+      time, and the rest of computer vision stops being mysterious.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>The operation</h2>
+    <p>
+      Take a 3×3 window of the image. Take a 3×3 grid of weights — the <strong>kernel</strong>.
+      Multiply them together element by element, add up the nine results, and write that single number
+      into the output image at the window's centre. Slide the window one pixel across and repeat, for
+      every pixel in the image. That's a convolution. There is nothing else to it.
+    </p>
+    <p>
+      The magic is entirely in the weights. A kernel with <code>−1</code> on the left and
+      <code>+1</code> on the right computes "how much brighter is the right side than the left?" —
+      which is zero everywhere the image is flat, and large exactly where a vertical edge is. You
+      didn't program an edge detector; you wrote down six numbers and an edge detector fell out.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Do it by hand</h2>
+    <p>
+      Click anywhere on the input to put the window there, or press scan and watch it sweep. The panel
+      on the right shows all nine multiplications for the window's current position and the single
+      number they produce.
+    </p>
+
+    <div class="split even">
+      <div class="panel">
+        <div class="panel-title"><h3>Input · 48×48 pixels</h3><span class="hint">click to move the window</span></div>
+        <canvas id="conv-in"></canvas>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-play" class="primary">▶ Scan the image</button>
+          <button id="btn-step-px">One pixel</button>
+        </div>
+        <div id="scan-controls" style="margin-top:8px"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Output · the feature map</h3><span class="hint">grey = zero, black/white = strong response</span></div>
+        <canvas id="conv-out"></canvas>
+        <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
+          For edge kernels the output is centred on mid-grey: zero response is grey, a strong positive
+          response is white and a strong negative one is black. An edge detector doesn't say "edge
+          here", it says "the brightness is changing here, in this direction, by this much".
+        </p>
+      </div>
+    </div>
+
+    <div class="split" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-title"><h3>The arithmetic at the window</h3></div>
+        <div id="math-panel"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>The kernel</h3><span class="hint">editable</span></div>
+        <div id="kernel-editor"></div>
+        <div style="margin-top:14px">
+          <div class="field"><label class="row"><span>Presets</span></label></div>
+          <div id="kernel-presets"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="split" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-title"><h3>The image</h3></div>
+        <div id="image-presets"></div>
+        <div style="margin-top:14px" id="draw-controls"></div>
+        <div class="controls" style="margin-top:10px">
+          <button id="btn-clear" class="small">Clear to black</button>
+          <label class="btn small" style="display:inline-block">
+            Upload an image
+            <input type="file" id="file-input" accept="image/*" style="display:none">
+          </label>
+        </div>
+        <p class="muted" style="font-size:.8rem;margin-top:10px;margin-bottom:0">
+          Uploads stay on your machine — the file is read straight into the canvas and never leaves
+          the page.
+        </p>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>The same image through six kernels</h3></div>
+        <div id="filter-bank"></div>
+        <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
+          A real convolutional layer does exactly this: it runs a whole <em>bank</em> of kernels over
+          the same input and stacks the results into a pile of feature maps, one per kernel. The
+          difference is that it doesn't use anyone's hand-written numbers — it learns its own.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Three details that matter later</h2>
+    <h3>Padding, or what happens at the border</h3>
+    <p>
+      The window at pixel (0,0) hangs off the edge of the image. Something has to fill those cells:
+      this page repeats the nearest edge pixel, others pad with zeros or refuse to compute the border
+      at all (which shrinks the output by two pixels per convolution). It sounds like a footnote until
+      you stack twenty layers and discover your image has quietly shrunk away.
+    </p>
+
+    <h3>Stride, or how far the window jumps</h3>
+    <p>
+      Sliding one pixel at a time gives an output the same size as the input. Jump two pixels at a
+      time — stride 2 — and the output is half the size in each direction. It's the cheapest way to
+      shrink a representation as it moves deeper into a network.
+    </p>
+
+    <h3>Pooling, or throwing away the details on purpose</h3>
+    <p>
+      Max pooling takes each 2×2 block and keeps only the largest value. You lose exactly where within
+      the block the response happened, and that loss is the point: after pooling, "there's a vertical
+      edge around here" survives while "at precisely this pixel" doesn't. That's how a network becomes
+      tolerant of a digit being drawn a couple of pixels to the left.
+    </p>
+    <div class="panel">
+      <div class="pool-row">
+        <div>
+          <canvas id="pool-in"></canvas>
+          <div class="bank-label">feature map · 48×48</div>
+        </div>
+        <div class="pool-arrow">→ max-pool 2×2 →</div>
+        <div>
+          <canvas id="pool-out"></canvas>
+          <div class="bank-label">pooled · 24×24</div>
+        </div>
+      </div>
+      <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
+        Half the width, half the height, a quarter of the numbers — and the strong responses all
+        survive. Change the kernel above and this updates with it.
+      </p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><strong>Type your own kernel.</strong> Put <code>1</code> in the top row, <code>−1</code> in
+        the bottom, zeros in the middle. You've just built a horizontal edge detector. Now flip the
+        signs and watch the output invert: the filter has a direction, and it cares which side is bright.</li>
+      <li><strong>Make every weight the same small positive number.</strong> That's a blur, and the
+        reason is worth sitting with: averaging a neighbourhood destroys exactly the high-frequency
+        detail an edge kernel is looking for. Blur and edge-detect are opposites.</li>
+      <li><strong>Run Sobel X on the diagonal stripes, then Sobel Y.</strong> Same image, very
+        different maps. One kernel cannot see everything, which is why layers have dozens of them.</li>
+      <li><strong>Try the noise image with a blur.</strong> Then with sharpen. Sharpening noise
+        produces more noise — a filter has no idea what's signal.</li>
+      <li><strong>Draw a thick white line, then a thin one.</strong> Compare the Laplacian's response.
+        Kernel size sets the scale of feature a layer can see; a 3×3 kernel is blind to anything
+        wider than three pixels, which is why real networks stack them.</li>
+      <li><strong>Upload a photo of yourself.</strong> Sobel X on a face is a genuinely strange and
+        useful thing to look at: it's roughly the first thing every vision model computes.</li>
+    </ul>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lessons/convolutions.js"></script>
+</body>
+</html>
