@@ -56,6 +56,28 @@ Every backward pass — dense, convolution, max pooling, softmax attention and l
 against numerical gradients before being used. If you have only ever called `loss.backward()`, these
 files are a short read that shows what it does.
 
+## Tests
+
+```bash
+node tests/gradcheck.cjs     # no dependencies
+```
+
+Checks every hand-written backward pass — dense layers, convolution, max pooling, softmax attention
+and layer norm — against numerical gradients, then sanity-checks the arena physics and confirms that
+PPO measurably improves play in twenty seconds. Two details are worth knowing if you read it: the
+pass criterion is a directional derivative over all parameters at once (thousands of parameters give
+a much better signal-to-noise ratio than perturbing weights one at a time), and per-weight
+comparisons skip gradients sitting at the float32 noise floor as well as ReLU kinks, where a finite
+difference measures a corner rather than a slope.
+
+```bash
+npm i -D playwright && npx playwright install chromium
+node tests/browser.cjs       # needs Playwright; the site itself does not
+```
+
+Loads every lesson, trains each model, drives the controls (keyboard driving in the arena, painting
+the maze, editing kernels, switching architectures) and fails on any console error.
+
 ## Design notes
 
 - **No frameworks and no build step.** Each library file works either as a plain `<script>` (exports
@@ -64,6 +86,12 @@ files are a short read that shows what it does.
   League agent starts hitting the ball within a minute or two and scoring shortly after.
 - **Deliberate failure modes.** Every lesson ends with experiments designed to break the model in an
   instructive way: reward hacking, overfitting, collapsed exploration, learning rates that explode.
+
+## Publishing it
+
+The site is plain static files, so GitHub Pages serves it as-is: in the repository's
+**Settings → Pages**, set the source to the branch and the `/ (root)` folder. No build step, no
+workflow, no configuration file.
 
 ## Browser support
 
