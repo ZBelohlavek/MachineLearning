@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Train a self-play Rocket League bot · Learn ML by Building</title>
+<meta name="description" content="Design the rewards, train a PPO agent by self-play in a top-down Rocket League arena, and then play against it — all in your browser.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  .act-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .act-cell {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    background: var(--bg-soft); border: 1px solid var(--line-soft);
+    border-radius: 8px; padding: 8px 10px; font-size: .74rem; color: var(--text-dim);
+  }
+  .act-cell i { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(77,163,255,.22); transition: width .12s linear; }
+  .act-cell span, .act-cell b { position: relative; }
+  .act-cell b { font-family: var(--mono); color: var(--text); font-weight: 600; }
+  .act-cell.best { border-color: var(--accent); }
+  .phase-list { counter-reset: phase; padding-left: 0; list-style: none; }
+  .phase-list li { counter-increment: phase; position: relative; padding-left: 40px; margin-bottom: 14px; }
+  .phase-list li::before {
+    content: counter(phase); position: absolute; left: 0; top: 1px;
+    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(77,163,255,.14); border: 1px solid rgba(77,163,255,.4);
+    color: #9fd0ff; font-size: .8rem; font-weight: 700; font-family: var(--mono);
+  }
+  .loop-svg { width: 100%; max-width: 560px; height: auto; display: block; margin: 18px auto; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Reinforcement learning · flagship project</div>
+    <h1>Train a self-play Rocket League bot</h1>
+    <p class="lead">
+      Nobody will show this agent a single example of a good shot. It starts by twitching at random
+      in an empty arena, and it has to discover — from a number that goes up when the ball moves the
+      right way — how to drive, how to line up, and how to score. You design the reward, you choose
+      the opponent, and you watch it happen frame by frame.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Why this can't be taught the normal way</h2>
+    <p>
+      Most machine learning is <strong>supervised</strong>: you hand the model thousands of examples
+      with the right answer attached, and it learns to copy them. That approach dies here. Nobody can
+      write down the "correct" steering angle for every possible arrangement of car, ball and
+      opponent — and even if they could, the right move often only reveals itself two seconds later,
+      when the ball rolls into the net.
+    </p>
+    <p>
+      <strong>Reinforcement learning</strong> replaces the labelled answer with a much weaker signal:
+      a reward. The agent acts, the world changes, a number comes back. Its job is to work out which
+      of the hundreds of decisions it just made deserve the credit. That's the whole field in one
+      sentence, and everything below is machinery for doing it reliably.
+    </p>
+
+    <svg class="loop-svg" viewBox="0 0 560 190" role="img" aria-label="The reinforcement learning loop: the agent observes a state, takes an action, and the environment returns a reward and a new state.">
+      <defs>
+        <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+          <path d="M0,0 L7,3.2 L0,6.4 z" fill="#4da3ff"/>
+        </marker>
+      </defs>
+      <rect x="24" y="60" width="170" height="70" rx="12" fill="#151d2e" stroke="#4da3ff" stroke-width="1.5"/>
+      <text x="109" y="90" text-anchor="middle" fill="#e6ecf7" font-family="system-ui" font-size="15" font-weight="600">Agent</text>
+      <text x="109" y="110" text-anchor="middle" fill="#9fb0cc" font-family="system-ui" font-size="11">policy network</text>
+
+      <rect x="366" y="60" width="170" height="70" rx="12" fill="#151d2e" stroke="#7c5cff" stroke-width="1.5"/>
+      <text x="451" y="90" text-anchor="middle" fill="#e6ecf7" font-family="system-ui" font-size="15" font-weight="600">Environment</text>
+      <text x="451" y="110" text-anchor="middle" fill="#9fb0cc" font-family="system-ui" font-size="11">the arena + physics</text>
+
+      <path d="M194,80 C260,80 300,80 364,80" fill="none" stroke="#4da3ff" stroke-width="1.6" marker-end="url(#ah)"/>
+      <text x="279" y="70" text-anchor="middle" fill="#8ecbff" font-family="ui-monospace" font-size="11">action  (throttle, steer)</text>
+
+      <path d="M366,112 C300,112 260,112 196,112" fill="none" stroke="#4da3ff" stroke-width="1.6" marker-end="url(#ah)"/>
+      <text x="279" y="132" text-anchor="middle" fill="#8ecbff" font-family="ui-monospace" font-size="11">state + reward</text>
+
+      <text x="279" y="167" text-anchor="middle" fill="#6d7f9c" font-family="system-ui" font-size="11">30 times a second, for millions of steps</text>
+    </svg>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Step 1 · Drive the car yourself</h2>
+    <p>
+      Before you train anything, get a feel for the world the agent lives in. Use
+      <kbd>←</kbd> <kbd>→</kbd> to steer and <kbd>↑</kbd> <kbd>↓</kbd> for throttle and reverse
+      (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> works too). Notice that you can only turn
+      while you're moving — exactly like a real car, and exactly the thing that makes this hard to learn.
+    </p>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title">
+          <h3>The arena</h3>
+          <span class="hint">click the arena first, then use the arrow keys</span>
+        </div>
+        <canvas id="sandbox-canvas" class="stage"></canvas>
+        <div id="sandbox-controls" style="margin-top:12px"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>Reward, right now</h3></div>
+        <p class="muted" style="font-size:.84rem">
+          Every term below is being computed for the car you're driving, every single tick.
+          Green is positive, red is negative. This is the entire feedback the agent will ever get.
+        </p>
+        <div id="reward-bars"></div>
+        <div style="margin-top:10px;font-size:.85rem" class="muted">
+          Episode total so far: <span class="mono" id="reward-total" style="color:var(--text)">0.0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <div class="panel-title">
+        <h3>What the agent actually sees</h3>
+        <span class="hint">24 numbers, updated 30× a second</span>
+      </div>
+      <canvas id="obs-canvas" class="fit"></canvas>
+      <p style="margin-top:12px">
+        There are no pixels here. The policy never sees the picture above — it sees these 24 numbers,
+        and nothing else. Two design decisions in this list do most of the heavy lifting:
+      </p>
+      <ul>
+        <li><strong>It's egocentric.</strong> "ball ahead" and "ball left" are measured in the car's own
+          frame, not the field's. A situation that looks the same from the driver's seat produces the
+          same numbers wherever on the pitch it happens, so a lesson learned in one corner transfers to
+          the other three.</li>
+        <li><strong>It's side-agnostic.</strong> Orange's world is rotated 180° before it hits the
+          network, so both cars believe they are attacking the right-hand goal. That's what lets a
+          <em>single</em> network play both sides of a self-play match.</li>
+      </ul>
+      <div class="note">
+        <b class="label">Observation design is where most RL projects are won or lost</b>
+        <p class="mb0">Feed the network raw absolute coordinates and it has to learn the same skill four
+        times over. Feed it the right relative quantities and it can generalise from a fraction of the
+        experience. Nothing in the algorithm below can rescue a bad observation.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Step 2 · Design the reward</h2>
+    <p>
+      Here's the uncomfortable truth about reinforcement learning: the agent does not do what you want.
+      It does what you <em>reward</em>. Those are the same thing only if you were extremely careful.
+    </p>
+    <p>
+      Scoring is the real objective, but a goal happens maybe once in three hundred decisions, and only
+      after a long chain of them went right. Learning from that signal alone is possible but slow — try
+      the "Goals only" preset later and watch it flounder. So we add <strong>shaping</strong> terms:
+      small, dense hints that point in roughly the right direction. Shaping is how you get an agent off
+      the ground, and it is also how you accidentally teach it something ridiculous.
+    </p>
+
+    <div class="split wide-right">
+      <div class="panel">
+        <div class="panel-title"><h3>Presets</h3></div>
+        <div id="reward-presets"></div>
+        <div style="margin-top:16px" class="note warn">
+          <b class="label">Try to break it</b>
+          <p class="mb0">Set <code>approach</code> high and <code>push</code> to zero, then train.
+          You'll get an agent that adores the ball and follows it lovingly around the pitch without
+          ever putting it in the net. That is <em>reward hacking</em>: it found the maximum of the
+          function you actually wrote instead of the one you meant.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">
+          <h3>Reward weights</h3>
+          <span class="hint">changes apply to the next training batch</span>
+        </div>
+        <div id="reward-sliders"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Step 3 · How the learning actually works</h2>
+    <p>
+      The agent is a small neural network: 24 inputs, two hidden layers of 64 units, and 9 outputs —
+      one score per action (three throttle settings × three steering settings). Softmax turns those
+      scores into probabilities, and the agent rolls a die. Randomness is not a flaw here; it is the
+      only way it ever discovers anything.
+    </p>
+    <p>
+      Training uses <strong>PPO</strong> (Proximal Policy Optimisation), the same family of algorithm
+      behind most of the game-playing agents you've read about. Each round of training does three things:
+    </p>
+    <ol class="phase-list">
+      <li><strong>Play.</strong> Run a batch of episodes with the current policy, recording every state,
+        the action taken, and the probability the policy assigned to it at the time.</li>
+      <li><strong>Judge.</strong> A second network — the <em>critic</em> — predicts how much total future
+        reward each state was worth. Subtracting its prediction from what actually happened gives the
+        <strong>advantage</strong>: not "was this good?" but "was this better than expected?" That
+        distinction is what makes the signal usable. Winning from a great position teaches nothing;
+        winning from a hopeless one teaches a lot.</li>
+      <li><strong>Improve.</strong> Nudge the network to make positive-advantage actions more likely —
+        but <em>clip</em> the change, so a single noisy batch can never yank the policy somewhere
+        it can't recover from. That clip is the "proximal" in PPO, and it's the difference between
+        training that converges and training that explodes.</li>
+    </ol>
+    <div class="note">
+      <b class="label">Everything is running on this page</b>
+      <p class="mb0">The physics, both networks, backpropagation, Adam, GAE and the PPO update are
+      about 600 lines of plain JavaScript in
+      <code>assets/js/lessons/rocket-train.js</code> and <code>assets/js/lib/nn.js</code>.
+      There is no server and no pre-trained model: when you hit start, your laptop is doing the learning.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Step 4 · Train it</h2>
+    <p>
+      Press start and leave it running. Below is what to look for, roughly in the order it happens —
+      expect the first two phases within a minute or so on a modern laptop.
+    </p>
+    <ul class="phase-list">
+      <li><strong>Twitching (0–30s).</strong> Actions are near-uniform noise. The car spins. Reward
+        hovers around zero and entropy sits near its maximum of 2.20.</li>
+      <li><strong>Ball attraction (30s–2min).</strong> "Touches per episode" lifts off the floor. The
+        approach and touch terms are the easiest reward to collect, so they get collected first.</li>
+      <li><strong>Direction (2–6min).</strong> Touches start turning into shots. "Episodes ending in a
+        goal" climbs. Entropy falls as the policy commits to habits.</li>
+      <li><strong>Positioning (6min+).</strong> The agent begins approaching from the correct side
+        instead of nudging the ball wherever it happens to be facing — the first behaviour that looks
+        genuinely deliberate.</li>
+    </ul>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title">
+          <h3>Live self-play match</h3>
+          <span class="hint">both cars share one brain</span>
+        </div>
+        <canvas id="train-canvas" class="stage"></canvas>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-train" class="primary">▶ Start training</button>
+          <button id="btn-eval">Evaluate</button>
+          <button id="btn-reset" class="danger">Reset agent</button>
+        </div>
+        <div id="eval-out" style="margin-top:10px;font-size:.85rem;color:var(--text-dim)"></div>
+        <div style="margin-top:14px">
+          <div class="field"><label class="row"><span>Training speed</span></label></div>
+          <div id="train-controls-2"></div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="field"><label class="row"><span>Who does it play against?</span></label></div>
+          <div id="opponent-mode"></div>
+        </div>
+        <div class="controls" style="margin-top:16px">
+          <button id="btn-save" class="small">Save agent</button>
+          <button id="btn-load" class="small">Load agent</button>
+          <button id="btn-export" class="small">Export JSON</button>
+          <span id="save-out" class="muted" style="font-size:.82rem"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>Progress</h3></div>
+        <div id="train-stats"></div>
+        <div style="margin-top:14px">
+          <canvas id="chart-reward" class="fit"></canvas>
+          <canvas id="chart-skill" class="fit" style="margin-top:10px"></canvas>
+          <canvas id="chart-learn" class="fit" style="margin-top:10px"></canvas>
+        </div>
+        <p class="muted" style="font-size:.8rem;margin-top:10px">
+          Reward per episode is the number being optimised, but it is not the score you care about —
+          change the weights and it changes meaning. <em>Episodes ending in a goal</em> and the
+          Evaluate button are the honest measures.
+        </p>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <div class="panel-title">
+        <h3>Hyperparameters</h3>
+        <span class="hint">safe to change mid-run</span>
+      </div>
+      <div id="hp-controls" class="split even" style="gap:6px 26px"></div>
+    </div>
+
+    <div class="note warn" style="margin-top:18px">
+      <b class="label">Self-play has a trap in it</b>
+      <p class="mb0">When both cars share one brain, "goals scored" is always about equal to
+      "goals conceded" — the agent is playing itself, so the net score is meaningless no matter how
+      good it gets. Worse, two agents can drift into a stable, mutually terrible equilibrium and never
+      leave. That's why the opponent selector offers a <em>frozen past self</em> (a snapshot from
+      several updates ago) and a fixed scripted bot: an opponent that doesn't move with you is the
+      only way to know you're improving.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Step 5 · Look inside the policy</h2>
+    <p>
+      This is the same network from the match above, drawn live. The left column is the observation,
+      the middle two are the hidden layers, and the right is the raw action scores. Blue is negative,
+      red is positive. Watch it as the ball approaches: whole regions of the hidden layers switch
+      character as the situation changes.
+    </p>
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>Activations</h3></div>
+        <canvas id="net-canvas" class="fit"></canvas>
+        <div id="value-readout" style="margin-top:10px;font-size:.85rem;color:var(--text-dim)"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>What it wants to do</h3></div>
+        <div id="action-grid" class="act-grid"></div>
+        <p class="muted" style="font-size:.82rem;margin-top:12px">
+          Early in training these nine bars are all about 11% — the agent is guessing. As it learns,
+          the distribution sharpens. If they collapse to a single 100% bar too early, the agent has
+          stopped exploring: raise the entropy bonus and reset.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Step 6 · Take it on yourself</h2>
+    <p>
+      Switch the match to <em>You vs agent</em> and drive the orange car with the arrow keys. Playing
+      against your own agent tells you things no chart will: whether it defends, whether it panics
+      near its own goal, whether it can be walked around the same way twice.
+    </p>
+    <div class="panel">
+      <div class="panel-title"><h3>Match settings</h3><span class="hint">applies to the arena in Step 4</span></div>
+      <div id="play-mode"></div>
+      <p class="muted" style="font-size:.82rem;margin-top:12px">
+        Greedy mode removes the randomness and always plays the top-scoring action — that's how you'd
+        ship an agent. Leave it off during training: the exploration is what's producing the learning.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><strong>Kill the shaping.</strong> Load the "Goals only" preset and reset. With a reward that
+        arrives once every few hundred steps, progress nearly stops. This is the sparse-reward problem,
+        and it's why so much RL research is really about exploration.</li>
+      <li><strong>Turn the curriculum off.</strong> The agent then starts every episode with a full
+        random kickoff instead of near the ball. Compare how long the first touches take to appear.</li>
+      <li><strong>Set the entropy bonus to zero.</strong> Sometimes it's fine. Sometimes the policy
+        locks onto "always turn left" in the first minute and never escapes, because it stopped
+        sampling anything else long enough to find out there was better.</li>
+      <li><strong>Push the discount γ down to 0.85.</strong> The agent becomes short-sighted: it will
+        take a touch now over a goal in two seconds, because two seconds of discounting has made the
+        goal nearly worthless.</li>
+      <li><strong>Crank the learning rate to 0.02.</strong> Watch the reward curve spike and then fall
+        apart. Then look at the PPO clip slider and try to work out why it doesn't fall apart
+        <em>immediately</em>.</li>
+      <li><strong>Train against the scripted bot instead of self-play.</strong> You'll get an agent that
+        beats that specific bot and is oddly bad against you. Overfitting isn't only a supervised problem.</li>
+    </ul>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lessons/rocket-env.js"></script>
+<script src="../assets/js/lessons/rocket-train.js"></script>
+<script src="../assets/js/lessons/rocket.js"></script>
+</body>
+</html>
