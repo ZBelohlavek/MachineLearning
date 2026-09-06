@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a neural network learns · Learn ML by Building</title>
+<meta name="description" content="Draw your own dataset and watch a neural network learn to separate it — gradient descent, layers, activations and overfitting, live in the browser.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  #data-canvas { width: 100%; border-radius: 10px; border: 1px solid var(--line); cursor: crosshair; }
+  .neuron-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 14px; }
+  .neuron { border-radius: 6px; border: 1px solid var(--line-soft); image-rendering: pixelated; width: 34px; height: 34px; }
+  .neuron-label { font-size: .74rem; letter-spacing: .07em; text-transform: uppercase; color: var(--text-mute); }
+  .eq { background: #0d1320; border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px;
+        font-family: var(--mono); font-size: .92rem; color: #cfe0ff; overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Core ideas · start here</div>
+    <h1>How a neural network learns</h1>
+    <p class="lead">
+      Every model on this site — the vision networks, the Rocket League agent — is the same machine
+      underneath: a stack of multiplications with a knob on each one, and a procedure for turning
+      those knobs. This page is that machine, small enough to watch. Draw some points and train it
+      in front of you.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>The whole idea in four sentences</h2>
+    <p>
+      A neural network is a function with adjustable numbers in it. You feed in an input — here, the
+      two coordinates of a point — and it produces an output, here a number between 0 and 1 meaning
+      "how confident am I that this point is orange?".
+    </p>
+    <p>
+      A <strong>loss function</strong> scores how wrong that output was. <strong>Backpropagation</strong>
+      then works out, for every single weight in the network, whether nudging it up or down would have
+      made the loss smaller — and by how much. <strong>Gradient descent</strong> takes a small step in
+      that direction. Repeat a few thousand times and the boundary you see below bends itself around
+      your data.
+    </p>
+    <div class="eq">
+      loss &nbsp;=&nbsp; how wrong we were &nbsp;&nbsp;→&nbsp;&nbsp; gradient &nbsp;=&nbsp; ∂loss/∂weight
+      &nbsp;&nbsp;→&nbsp;&nbsp; weight &nbsp;←&nbsp; weight &nbsp;−&nbsp; learning-rate × gradient
+    </div>
+    <p style="margin-top:14px">
+      That's it. Everything else in deep learning is this loop with better plumbing.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>The playground</h2>
+    <p>
+      Blue-outlined points are <strong>training</strong> data the network learns from; white-outlined
+      points are <strong>test</strong> data it never sees during training. The background shows what
+      the network currently believes about every point in the plane. You can draw your own points
+      directly onto the canvas.
+    </p>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title">
+          <h3>Decision boundary</h3>
+          <span class="hint">click and drag on the canvas to add points</span>
+        </div>
+        <canvas id="data-canvas"></canvas>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-run" class="primary">▶ Train</button>
+          <button id="btn-step">One epoch</button>
+          <button id="btn-reinit">New random weights</button>
+          <button id="btn-regen">New data</button>
+        </div>
+        <div style="margin-top:12px" id="paint-pills"></div>
+        <div class="legend" style="margin-top:12px">
+          <span><i style="background:#4da3ff"></i>class 0</span>
+          <span><i style="background:#ff9f45"></i>class 1</span>
+          <span><i style="background:#fff"></i>white outline = held-out test point</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>Training</h3></div>
+        <div id="fd-stats"></div>
+        <canvas id="loss-chart" class="fit" style="margin-top:14px"></canvas>
+        <div class="note warn" style="margin-top:14px">
+          <b class="label">Watch the two curves separate</b>
+          <p class="mb0">While both fall, the network is learning something real. The moment the
+          orange test curve turns back upward while the blue one keeps dropping, it has started
+          memorising noise instead of finding structure. That's <em>overfitting</em>, and it is the
+          single most common way a model that looks great turns out to be useless.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="split" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-title"><h3>The dataset</h3></div>
+        <div id="dataset-pills"></div>
+        <div id="data-controls" style="margin-top:10px"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>The network</h3></div>
+        <div id="arch-controls"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <div class="panel-title"><h3>The optimiser</h3></div>
+      <div id="opt-controls" class="split even" style="gap:6px 26px"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>What each neuron is actually doing</h2>
+    <p>
+      Each tile below is one hidden neuron, drawn across the same square of space as the main canvas:
+      orange where that neuron fires positively, blue where it fires negatively.
+    </p>
+    <div class="panel">
+      <div id="neurons"></div>
+      <p class="muted" style="font-size:.84rem;margin-bottom:0">
+        Neurons in the first layer can only ever draw a straight edge — that's all a weighted sum
+        followed by a squashing function can do. The interesting part is the second layer, whose
+        neurons combine those straight edges into corners, stripes and blobs. Depth is exactly this:
+        composing simple pieces into complicated shapes. Train the spiral with one hidden layer, then
+        with three, and compare the tiles.
+      </p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><strong>Remove all hidden layers.</strong> The model collapses to logistic regression and can
+        only draw one straight line. On the blobs it does fine. On the spiral it is hopeless, no
+        matter how long you train — some problems need depth, not patience.</li>
+      <li><strong>Train the spiral with 2 neurons per layer, then 16.</strong> Capacity is the ability
+        to represent complicated shapes. Too little and it can't fit; too much and it fits your noise
+        as eagerly as your signal.</li>
+      <li><strong>Set noise to 0.35 and train a big network for a long time.</strong> Watch train
+        accuracy march toward 100% while test accuracy stalls or falls. Now add weight decay and watch
+        the boundary calm down.</li>
+      <li><strong>Set the learning rate to 0.3.</strong> The loss curve turns into a saw. The steps
+        are so big they overshoot the valley they're trying to descend into.</li>
+      <li><strong>Switch tanh to ReLU on the circles.</strong> ReLU boundaries are made of straight
+        facets — you can see the polygon. tanh gives you curves. The activation function is quite
+        literally the shape of what the network can draw.</li>
+      <li><strong>Draw a tiny cluster of orange points inside the blue region.</strong> Then train.
+        How much does one small contradiction distort the whole boundary? That's how brittle a model
+        trained on a handful of points really is.</li>
+    </ul>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lessons/foundations.js"></script>
+</body>
+</html>
