@@ -227,15 +227,23 @@
       expect the first two phases within a minute or so on a modern laptop.
     </p>
     <ul class="phase-list">
-      <li><strong>Twitching (0–30s).</strong> Actions are near-uniform noise. The car spins. Reward
-        hovers around zero and entropy sits near its maximum of 2.20.</li>
-      <li><strong>Ball attraction (30s–2min).</strong> "Touches per episode" lifts off the floor. The
-        approach and touch terms are the easiest reward to collect, so they get collected first.</li>
-      <li><strong>Direction (2–6min).</strong> Touches start turning into shots. "Episodes ending in a
-        goal" climbs. Entropy falls as the policy commits to habits.</li>
-      <li><strong>Positioning (6min+).</strong> The agent begins approaching from the correct side
+      <li><strong>Twitching (0–30s).</strong> Actions are near-uniform noise, the car spins on the
+        spot, and entropy sits near its maximum of 2.20 (that's ln 9, a policy with no opinion at
+        all). Reward hovers around zero.</li>
+      <li><strong>Ball attraction (30s–2min).</strong> "Touches per episode" lifts off the floor and
+        the reward curve turns upward. The approach and touch terms are the cheapest reward on offer,
+        so they get collected first — this is reward shaping doing its job.</li>
+      <li><strong>Direction (2–4min).</strong> Touches start turning into shots and entropy falls
+        below about 1.0 as the policy commits to habits. On a recent run this page reached 74% of
+        episodes ending in a goal after three minutes, and beat the scripted bot 8–6.</li>
+      <li><strong>The curriculum bites.</strong> Watch the "difficulty" stat. It starts at 30% — the
+        ball spawns close by — and only widens once the agent reliably finds it. When it reaches
+        100%, touches per episode usually <em>drop</em> for a while: the problem just got harder, not
+        the agent worse. A metric falling because the task changed underneath it is one of the most
+        common ways to misread a training run.</li>
+      <li><strong>Positioning (5min+).</strong> The agent starts approaching from the correct side
         instead of nudging the ball wherever it happens to be facing — the first behaviour that looks
-        genuinely deliberate.</li>
+        genuinely deliberate rather than merely eager.</li>
     </ul>
 
     <div class="split">

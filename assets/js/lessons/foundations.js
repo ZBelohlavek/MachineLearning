@@ -242,11 +242,11 @@
         host.appendChild(label);
         for (let u = 0; u < layer.nOut; u++) {
           const c = document.createElement('canvas');
-          c.width = 34; c.height = 34;
+          c.width = 44; c.height = 44;
           c.className = 'neuron';
           c.title = `layer ${li + 1}, neuron ${u + 1}`;
           row.appendChild(c);
-          neuronCanvases.push({ canvas: c, layer: li, unit: u, img: c.getContext('2d').createImageData(34, 34) });
+          neuronCanvases.push({ canvas: c, layer: li, unit: u, img: c.getContext('2d').createImageData(44, 44) });
         }
         host.appendChild(row);
       });
@@ -254,7 +254,7 @@
 
     function drawNeurons() {
       if (!neuronCanvases.length) return;
-      const N = 34;
+      const N = 44;
       // one forward pass per grid point gives every neuron's value at once
       const cache = [];
       for (let j = 0; j < N; j++) {
