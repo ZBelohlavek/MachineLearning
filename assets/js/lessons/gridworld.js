@@ -227,8 +227,21 @@
           ctx.fillRect(px, py, cell, cell);
 
           if (t === WALL) {
-            ctx.fillStyle = '#26314a';
+            ctx.fillStyle = '#3a4a6d';
             ctx.fillRect(px + 1, py + 1, cell - 2, cell - 2);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(px + 1, py + 1, cell - 2, cell - 2);
+            ctx.clip();                                      // keep hatching inside the cell
+            ctx.strokeStyle = 'rgba(255,255,255,.10)';
+            ctx.lineWidth = 1;
+            for (let k = -cell; k < cell; k += 6) {
+              ctx.beginPath();
+              ctx.moveTo(px + k, py + cell);
+              ctx.lineTo(px + k + cell, py);
+              ctx.stroke();
+            }
+            ctx.restore();
           } else if (t === GOAL || t === PIT) {
             const good = t === GOAL;
             ctx.fillStyle = good ? 'rgba(56,211,159,.22)' : 'rgba(255,107,107,.20)';

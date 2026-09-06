@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patches, attention and Vision Transformers · Learn ML by Building</title>
+<meta name="description" content="Cut an image into patches, train a real single-head Vision Transformer in your browser, and read the attention maps it learns.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  canvas.tile { image-rendering: pixelated; border-radius: 4px; border: 1px solid var(--line-soft); display: block; }
+  #vit-image { image-rendering: pixelated; border-radius: 10px; border: 1px solid var(--line); cursor: crosshair; }
+  #attn-matrix { image-rendering: pixelated; border-radius: 8px; border: 1px solid var(--line); }
+  #vit-pad { background: #000; border: 1px solid var(--line); border-radius: 10px; cursor: crosshair; touch-action: none; }
+  #patch-strip { display: flex; flex-wrap: wrap; gap: 5px; }
+  .patch-item { text-align: center; padding: 2px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; }
+  .patch-item.sel { border-color: var(--ball); }
+  .patch-idx { font-family: var(--mono); font-size: .62rem; color: var(--text-mute); }
+  #pos-grid { display: grid; gap: 3px; justify-content: start; }
+  .pbar { display: grid; grid-template-columns: 18px 1fr 42px; gap: 8px; align-items: center; margin: 4px 0; font-size: .8rem; }
+  .pbar .d { font-family: var(--mono); color: var(--text-mute); }
+  .pbar .track { height: 9px; background: var(--line-soft); border-radius: 5px; overflow: hidden; }
+  .pbar .track i { display: block; height: 100%; width: 0; background: var(--accent-2); border-radius: 5px; }
+  .pbar .v { font-family: var(--mono); font-size: .74rem; color: var(--text-dim); text-align: right; }
+  .pbar.best .d, .pbar.best .v { color: var(--good); font-weight: 700; }
+  .pbar.best .track i { background: var(--good); }
+  .chip { display: inline-block; font-family: var(--mono); font-size: .74rem; color: var(--text-dim);
+          background: var(--bg-soft); border: 1px solid var(--line-soft); border-radius: 999px;
+          padding: 3px 10px; margin: 3px 4px 0 0; }
+  .chip b { color: var(--accent-2); }
+  .qkv { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 16px 0; }
+  .qkv .panel b { color: var(--accent-2); }
+  .eq { background: #0d1320; border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px;
+        font-family: var(--mono); font-size: .92rem; color: #cfe0ff; text-align: center; overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Computer vision · attention</div>
+    <h1>Patches, attention and Vision Transformers</h1>
+    <p class="lead">
+      A convolutional network is built on an assumption: what matters is nearby. A Vision Transformer
+      throws that assumption away. It chops the image into patches, treats them as a sequence, and
+      lets every patch look at every other patch from the very first layer. Below is a real one —
+      single head, written by hand, trained live on this page — with its attention maps exposed.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Step 1 · An image becomes a sequence</h2>
+    <p>
+      A transformer has no idea what an image is. It processes <em>sequences of vectors</em>, so the
+      first job is to turn a picture into one: slice it into a grid of non-overlapping squares,
+      flatten each square into a list of numbers, and multiply each by a learned matrix to get a
+      token. A 20×20 image with 4×4 patches becomes 25 tokens.
+    </p>
+    <p>
+      Flattening destroys all spatial information — token 7 has no idea it came from the middle of
+      the second row. So the model adds a learned <strong>position embedding</strong> to each token: a
+      little vector that means "I am patch 7". Position in a transformer isn't structural, it's
+      something the model has to be told, and then has to learn to use.
+    </p>
+
+    <div class="panel">
+      <div class="panel-title">
+        <h3>The patch sequence</h3>
+        <span class="hint">click any patch to make it the query</span>
+      </div>
+      <div id="patch-strip"></div>
+      <div style="margin-top:14px">
+        <div class="field"><label class="row"><span>Patch size</span></label></div>
+        <div id="patch-pills"></div>
+      </div>
+      <p class="muted" style="font-size:.82rem;margin:12px 0 0">
+        Patch size is the central trade in a ViT. Big patches mean few tokens and cheap attention,
+        but each token is a coarse summary. Small patches see fine detail and cost far more —
+        attention compares every token with every other, so halving the patch size roughly
+        <em>sixteen-times</em> the attention work.
+      </p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Step 2 · What attention computes</h2>
+    <p>
+      Each token produces three vectors by multiplying itself with three learned matrices:
+    </p>
+    <div class="qkv">
+      <div class="panel"><b>Query</b><p class="mb0" style="font-size:.88rem">What am I looking for? Emitted by the token doing the looking.</p></div>
+      <div class="panel"><b>Key</b><p class="mb0" style="font-size:.88rem">What do I contain? A label other tokens can match against.</p></div>
+      <div class="panel"><b>Value</b><p class="mb0" style="font-size:.88rem">What do I pass on if someone attends to me?</p></div>
+    </div>
+    <p>
+      Compare every query against every key with a dot product, scale, and softmax the result into
+      weights that sum to one. Each token's output is the weighted average of everyone's values:
+    </p>
+    <div class="eq">attention(Q, K, V) &nbsp;=&nbsp; softmax( Q·Kᵀ / √d ) · V</div>
+    <p style="margin-top:16px">
+      That's the entire mechanism. It's a soft, differentiable lookup: <em>find the tokens whose keys
+      match my query, and mix their values together</em>. Nothing in it knows about images,
+      neighbourhoods or edges — which is exactly why the same operation drives language models too.
+    </p>
+    <div class="note">
+      <b class="label">Why √d?</b>
+      <p class="mb0">Dot products of d-dimensional vectors grow with d. Without the scaling the
+      scores get large, softmax saturates into a hard one-hot pick, and the gradient through it
+      nearly vanishes. Dividing by √d keeps the scores in the range where softmax stays soft and
+      trainable — a one-symbol fix for a real training failure.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Step 3 · Train it and read the attention</h2>
+    <p>
+      Same generated digits as the CNN lesson, so the comparison is fair. Train it, then click around
+      the image: the purple overlay shows where the attention flows. Before training the maps are
+      near-uniform noise — every patch mildly interested in everything. After training they get
+      structure.
+    </p>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>Attention on this image</h3><span class="hint">click a patch</span></div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+          <canvas id="vit-image"></canvas>
+          <div>
+            <canvas id="attn-matrix"></canvas>
+            <div class="muted" style="font-size:.74rem;margin-top:6px;max-width:220px">
+              The full attention matrix: row <i>t</i>, column <i>u</i> is how much patch <i>t</i>
+              attends to patch <i>u</i>. Every row sums to 1.
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:14px" id="attn-mode"></div>
+        <div id="attn-top" style="margin-top:10px"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>Prediction</h3></div>
+        <div id="vit-verdict" style="font-size:1rem;margin-bottom:10px"></div>
+        <div id="vit-probs"></div>
+        <div style="margin-top:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+          <div>
+            <canvas id="vit-pad"></canvas>
+            <div class="muted" style="font-size:.74rem;margin-top:5px">draw a digit here</div>
+          </div>
+          <div class="controls" style="flex-direction:column;align-items:stretch">
+            <button id="btn-next-digit" class="small">Random digit</button>
+            <button id="btn-clear-pad" class="small">Clear pad</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="split" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-title"><h3>Training</h3></div>
+        <div id="vit-stats"></div>
+        <div class="controls" style="margin-top:14px">
+          <button id="btn-train" class="primary">▶ Train the transformer</button>
+          <button id="btn-reset" class="danger">Start over</button>
+          <button id="btn-regen" class="small">New data</button>
+        </div>
+        <canvas id="vit-chart" class="fit" style="margin-top:14px"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Configuration</h3></div>
+        <div id="vit-config"></div>
+        <div style="margin-top:8px">
+          <div class="field"><label class="row"><span>Architecture</span></label></div>
+          <div id="arch-toggles"></div>
+          <div class="desc" style="font-size:.78rem;color:var(--text-mute);margin-top:8px">
+            Two real design choices, switchable. The <b>class token</b> is an extra learned token that
+            attends to every patch and whose output feeds the classifier — the arrangement used by the
+            ViT paper. The alternative simply averages the patch tokens. <b>LayerNorm</b> normalises
+            each token before each block; without it a deeper stack becomes hard to train, though at
+            this size you may find it costs more than it gives.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Step 4 · What the position embeddings learned</h2>
+    <p>
+      Each tile below belongs to one patch position, and shows how similar that position's learned
+      embedding is to every other position's. Red is similar, blue is dissimilar.
+    </p>
+    <div class="panel">
+      <div id="pos-grid"></div>
+      <p class="muted" style="font-size:.84rem;margin:14px 0 0">
+        At initialisation these are random static. As training proceeds, each tile typically develops
+        a bright spot at its own location and a soft glow around it — the model has worked out, from
+        nothing but the data, which patches are neighbours. It had to <em>learn</em> the grid layout
+        that a convolution gets for free from its architecture. That's the core trade of the whole
+        approach: fewer built-in assumptions, more that must be learned, and therefore a much bigger
+        appetite for data.
+      </p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>CNN or transformer?</h2>
+    <p>
+      On this page the CNN wins, and it should: 1,000 tiny images is exactly the regime where
+      built-in assumptions pay. A convolution starts life already knowing that pixels near each other
+      belong together and that a pattern means the same thing wherever it appears. The transformer
+      starts knowing nothing and must learn both facts from examples.
+    </p>
+    <p>
+      Flip the data budget and the ranking flips with it. Given hundreds of millions of images, the
+      transformer's lack of assumptions becomes freedom: it can learn relationships a 3×3 kernel
+      structurally cannot express — the top-left of an image directly informing the bottom-right in
+      layer one. That is the actual finding of the ViT paper, and it is the reason both architectures
+      are still in use.
+    </p>
+    <div class="note good">
+      <b class="label">What's missing here, honestly</b>
+      <p class="mb0">A production ViT has multiple attention heads per layer (this has one), a dozen
+      or more stacked blocks (this has one), layer normalisation before each block, dropout, and a
+      dedicated classification token instead of averaging. Each is a fix for a real problem that
+      appears at scale. What's on this page is the load-bearing idea with the scaffolding removed.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><strong>Look at the attention before training, then after.</strong> Untrained maps are flat
+        — every patch attends to everything about equally. Trained maps concentrate. That change is
+        the model deciding what's worth looking at.</li>
+      <li><strong>Switch to "average attention received".</strong> After training, the bright patches
+        usually sit on the digit's strokes rather than the empty background. Nobody labelled the
+        strokes; attention found them because they carry the information.</li>
+      <li><strong>Set patches to 10×10 (a 2×2 grid).</strong> Four tokens is nearly no spatial
+        resolution and accuracy collapses. Then try 2×2 patches: 100 tokens, far more attention
+        arithmetic, slower training — and not obviously better at this size.</li>
+      <li><strong>Shrink the embedding to 8.</strong> Queries and keys now live in eight dimensions,
+        so tokens can barely distinguish themselves and attention gets muddy.</li>
+      <li><strong>Draw a digit far off centre.</strong> Compare how the CNN and the transformer cope.
+        Neither is truly translation invariant at the output, but they fail differently.</li>
+      <li><strong>Train, then set augmentation to 0 and regenerate.</strong> Watch the test accuracy
+        jump — not because the model improved, but because the exam got easier. Always ask what a
+        benchmark number is measuring.</li>
+    </ul>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/cnn.js"></script>
+<script src="../assets/js/lib/vit.js"></script>
+<script src="../assets/js/lib/digits.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lessons/vit-lesson.js"></script>
+</body>
+</html>

@@ -13,49 +13,10 @@
   'use strict';
   const { Conv2D, ReLU, MaxPool2, Flatten, FC, ConvNet,
           mulberry32, softmax, argmax, clamp, hidpi, fit, LineChart, heat, diverging,
-          chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop } = window.ML;
+          chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop,
+          renderDigit, makeDigitSet, imageFromCanvas } = window.ML;
 
   const S = 20;                       // digit images are S x S
-  const FONTS = ['sans-serif', 'serif', 'monospace', 'Georgia', 'Verdana', 'Courier New', 'Arial'];
-
-  /* --------------------------------------------------- digit generation */
-  const gen = document.createElement('canvas');
-  gen.width = S; gen.height = S;
-  const gctx = gen.getContext('2d', { willReadFrequently: true });
-
-  function renderDigit(digit, rng, aug) {
-    gctx.setTransform(1, 0, 0, 1, 0, 0);
-    gctx.fillStyle = '#000';
-    gctx.fillRect(0, 0, S, S);
-    const size = 15 + (rng() - 0.5) * 6 * aug;
-    const font = FONTS[(rng() * FONTS.length) | 0];
-    const bold = rng() < 0.4 ? 'bold ' : '';
-    gctx.fillStyle = '#fff';
-    gctx.font = `${bold}${size.toFixed(1)}px ${font}`;
-    gctx.textAlign = 'center';
-    gctx.textBaseline = 'middle';
-    gctx.translate(S / 2 + (rng() - 0.5) * 4 * aug, S / 2 + (rng() - 0.5) * 4 * aug);
-    gctx.rotate((rng() - 0.5) * 0.5 * aug);
-    gctx.fillText(String(digit), 0, 0);
-    const d = gctx.getImageData(0, 0, S, S).data;
-    const img = new Float32Array(S * S);
-    for (let i = 0; i < S * S; i++) {
-      let v = d[i * 4] / 255;
-      if (aug > 0) v = clamp(v + (rng() - 0.5) * 0.14 * aug, 0, 1);   // sensor noise
-      img[i] = v;
-    }
-    return img;
-  }
-
-  function makeSet(n, rng, aug) {
-    const xs = [], ys = [];
-    for (let i = 0; i < n; i++) {
-      const d = i % 10;
-      xs.push(renderDigit(d, rng, aug));
-      ys.push(d);
-    }
-    return { xs, ys, n };
-  }
 
   /* ------------------------------------------------------------- page */
   document.addEventListener('DOMContentLoaded', () => {
@@ -90,8 +51,8 @@
     }
 
     function regenerateData() {
-      trainSet = makeSet(1000, rng, aug);
-      testSet = makeSet(300, mulberry32(999), aug);
+      trainSet = makeDigitSet(1000, rng, aug, S);
+      testSet = makeDigitSet(300, mulberry32(999), aug, S);
       drawSamples();
     }
 
@@ -266,10 +227,6 @@
     const padBuf = document.createElement('canvas');
     padBuf.width = padSize; padBuf.height = padSize;
     const pbctx = padBuf.getContext('2d', { willReadFrequently: true });
-    const small = document.createElement('canvas');
-    small.width = S; small.height = S;
-    const sctx = small.getContext('2d', { willReadFrequently: true });
-
     function clearPad() {
       pbctx.fillStyle = '#000';
       pbctx.fillRect(0, 0, padSize, padSize);
@@ -329,12 +286,7 @@
 
     function predictPad() {
       // downscale the 224px pad to the 20x20 the network expects
-      sctx.fillStyle = '#000';
-      sctx.fillRect(0, 0, S, S);
-      sctx.drawImage(padBuf, 0, 0, S, S);
-      const d = sctx.getImageData(0, 0, S, S).data;
-      const img = new Float32Array(S * S);
-      for (let i = 0; i < S * S; i++) img[i] = d[i * 4] / 255;
+      const img = imageFromCanvas(padBuf, S);
       paintTile(smallCanvas, img, S, S, { raw: true });
 
       const probs = softmax(net.forward(img));
@@ -353,7 +305,7 @@
     document.getElementById('btn-random-digit').addEventListener('click', () => {
       // paint a generated digit onto the pad so you can test without drawing
       const d = (Math.random() * 10) | 0;
-      const img = renderDigit(d, mulberry32((Math.random() * 1e9) | 0), aug);
+      const img = renderDigit(d, mulberry32((Math.random() * 1e9) | 0), aug, S);
       pbctx.fillStyle = '#000';
       pbctx.fillRect(0, 0, padSize, padSize);
       const tmp = document.createElement('canvas');

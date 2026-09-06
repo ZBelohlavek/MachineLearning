@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn ML by Building — interactive machine learning, trained in your browser</title>
+<meta name="description" content="Six interactive lessons on machine learning: neural networks, convolutions, CNNs, vision transformers, Q-learning, and a self-play Rocket League bot you train yourself.">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 34px; align-items: center; }
+  @media (max-width: 880px) { .hero-grid { grid-template-columns: 1fr; } }
+  #hero-canvas { width: 100%; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .pitch { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin: 24px 0; }
+  .pitch .panel b { display: block; color: var(--text); margin-bottom: 4px; }
+  .track-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 40px; }
+  .track-head h2 { margin: 0; }
+  .track-head span { color: var(--text-mute); font-size: .9rem; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow">interactive · no installs · nothing pre-trained</span>
+        <h1>Learn machine learning by building it</h1>
+        <p class="lead">
+          Six lessons, each one a working model you train yourself in the browser. Design the reward
+          function for a Rocket League bot and watch it teach itself to score. Slide a convolution
+          kernel across an image by hand. Draw a digit and see every feature map in a network you
+          trained thirty seconds earlier.
+        </p>
+        <div class="controls" style="margin-top:22px">
+          <a class="btn primary" href="lessons/foundations.html" style="text-decoration:none">Start at the beginning</a>
+          <a class="btn" href="lessons/rocket-league.html" style="text-decoration:none">Jump to the Rocket League bot</a>
+        </div>
+      </div>
+      <canvas id="hero-canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="pitch">
+    <div class="panel">
+      <b>Everything runs here</b>
+      <p class="mb0" style="font-size:.9rem">No servers, no API keys, no downloads. Backpropagation,
+      Adam, PPO, convolutions and attention are all plain JavaScript in this repository, and your
+      machine does the training.</p>
+    </div>
+    <div class="panel">
+      <b>Nothing is pre-trained</b>
+      <p class="mb0" style="font-size:.9rem">Every model starts from random weights while you watch.
+      When the Rocket League agent scores, it's because it learned to, on your laptop, in the last
+      few minutes.</p>
+    </div>
+    <div class="panel">
+      <b>You are meant to break it</b>
+      <p class="mb0" style="font-size:.9rem">Every lesson ends with experiments designed to make the
+      model fail in an instructive way — reward hacking, overfitting, dead exploration, learning
+      rates that explode.</p>
+    </div>
+  </div>
+
+  <div class="track-head">
+    <h2>The lessons</h2>
+    <span>in order, though each one stands alone</span>
+  </div>
+  <div class="card-grid" id="lesson-cards"></div>
+
+  <div class="section">
+    <h2>Where to start</h2>
+    <p>
+      If you're new to all of this, go in order — the lessons deliberately build on each other. If
+      you came for one thing, jump straight to it:
+    </p>
+    <ul>
+      <li><strong>"I want the Rocket League bot."</strong> Go there directly, but read the
+        <a href="lessons/gridworld.html">Q-learning lesson</a> first if the words <em>reward</em>,
+        <em>policy</em> and <em>discount</em> are new — it's twenty minutes and the flagship lesson
+        assumes them.</li>
+      <li><strong>"I want to understand vision models."</strong> Convolutions → Train a CNN → Vision
+        Transformers, in that order. The first is arithmetic you do by hand; the last is a real
+        transformer with its attention maps exposed.</li>
+      <li><strong>"I've never trained anything."</strong> Start with
+        <a href="lessons/foundations.html">Foundations</a>. Everything else is that same loop with
+        more interesting shapes attached.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Running it yourself</h2>
+    <p>
+      Every page is static HTML, CSS and JavaScript with no build step and no dependencies. Open
+      <code>index.html</code> straight from disk and it works, or serve the folder if you prefer:
+    </p>
+    <pre><code>git clone https://github.com/ZBelohlavek/MachineLearning.git
+cd MachineLearning
+python3 -m http.server 8000     # then open http://localhost:8000</code></pre>
+    <p>
+      The machine learning code is deliberately readable and lives in
+      <code>assets/js/lib/</code>: <code>nn.js</code> (dense layers, backpropagation, Adam),
+      <code>cnn.js</code> (convolution, pooling), <code>vit.js</code> (attention, layer norm) and the
+      per-lesson environments under <code>assets/js/lessons/</code>. The backward passes are written
+      out by hand and checked against numerical gradients — if you've only ever called
+      <code>loss.backward()</code>, they're worth a read.
+    </p>
+  </div>
+</div>
+
+<script src="assets/js/lib/nn.js"></script>
+<script src="assets/js/lib/plot.js"></script>
+<script src="assets/js/lib/ui.js"></script>
+<script src="assets/js/home.js"></script>
+<script>
+/* A small animated arena on the hero: a scripted bot chasing a ball, so the
+   landing page shows the thing the site is about rather than describing it. */
+(function () {
+  document.addEventListener('DOMContentLoaded', () => {
+    const { hidpi, rafLoop } = window.ML;
+    const c = document.getElementById('hero-canvas');
+    let ctx, W, H;
+    const resize = () => {
+      c.style.width = '';
+      const w = c.clientWidth || 460;
+      ctx = hidpi(c, w, Math.round(w * 0.62));
+      W = ctx._cssW; H = ctx._cssH;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const ball = { x: 0.5, y: 0.5, vx: 0.22, vy: 0.15 };
+    const cars = [
+      { x: 0.2, y: 0.6, a: 0, col: '#4da3ff', speed: 0.55 },
+      { x: 0.8, y: 0.4, a: Math.PI, col: '#ff9f45', speed: 0.48 },
+    ];
+    const trail = [];
+
+    rafLoop((dt) => {
+      dt = Math.min(dt, 0.05);
+      ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+      if (ball.x < 0.04 || ball.x > 0.96) { ball.vx *= -1; ball.x = Math.max(0.04, Math.min(0.96, ball.x)); }
+      if (ball.y < 0.06 || ball.y > 0.94) { ball.vy *= -1; ball.y = Math.max(0.06, Math.min(0.94, ball.y)); }
+      ball.vx *= 0.999; ball.vy *= 0.999;
+      trail.push({ x: ball.x, y: ball.y });
+      if (trail.length > 40) trail.shift();
+
+      cars.forEach((car, i) => {
+        // Blue chases the ball; orange plays the ball's own side, so the two
+        // cars keep their distance instead of stacking on top of each other.
+        const tx = i === 0 ? ball.x : ball.x + 0.16;
+        const ty = i === 0 ? ball.y : ball.y - 0.12;
+        const want = Math.atan2(ty - car.y, tx - car.x);
+        let err = want - car.a;
+        while (err > Math.PI) err -= Math.PI * 2;
+        while (err < -Math.PI) err += Math.PI * 2;
+        car.a += Math.max(-2.4 * dt, Math.min(2.4 * dt, err * 2.2 * dt * 3));
+        car.x += Math.cos(car.a) * car.speed * dt * 0.42;
+        car.y += Math.sin(car.a) * car.speed * dt * 0.42;
+        car.x = Math.max(0.05, Math.min(0.95, car.x));
+        car.y = Math.max(0.08, Math.min(0.92, car.y));
+        const d = Math.hypot(ball.x - car.x, ball.y - car.y);
+        if (d < 0.06) {
+          const nx = (ball.x - car.x) / (d || 1), ny = (ball.y - car.y) / (d || 1);
+          ball.vx = nx * 0.42; ball.vy = ny * 0.42;
+        }
+      });
+
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, '#0d1526'); g.addColorStop(1, '#0a1120');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
+      for (let i = 1; i < 6; i++) {
+        ctx.beginPath(); ctx.moveTo((i / 6) * W, 0); ctx.lineTo((i / 6) * W, H); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,.14)';
+      ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, H * 0.16, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(77,163,255,.45)'; ctx.fillRect(0, H * 0.33, 5, H * 0.34);
+      ctx.fillStyle = 'rgba(255,159,69,.45)'; ctx.fillRect(W - 5, H * 0.33, 5, H * 0.34);
+
+      ctx.strokeStyle = 'rgba(255,209,102,.22)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      trail.forEach((p, i) => (i ? ctx.lineTo(p.x * W, p.y * H) : ctx.moveTo(p.x * W, p.y * H)));
+      ctx.stroke();
+
+      for (const car of cars) {
+        ctx.save();
+        ctx.translate(car.x * W, car.y * H);
+        ctx.rotate(car.a);
+        ctx.fillStyle = car.col;
+        ctx.fillRect(-11, -6.5, 22, 13);
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(5, -3.5); ctx.lineTo(5, 3.5); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      ctx.save();
+      ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 16;
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath(); ctx.arc(ball.x * W, ball.y * H, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }).start();
+  });
+})();
+</script>
+</body>
+</html>

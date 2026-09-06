@@ -208,7 +208,12 @@
       if (!running) return;
       const dt = last ? Math.min(0.05, (t - last) / 1000) : 1 / 60;
       last = t;
-      fn(dt, t);
+      try {
+        fn(dt, t);
+      } catch (err) {
+        // Keep the loop alive: one bad frame should not freeze the whole page.
+        console.error('animation frame failed:', err);
+      }
       id = requestAnimationFrame(tick);
     };
     return {
