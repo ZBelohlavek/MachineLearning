@@ -288,7 +288,12 @@
       strokePad(lastPt, p);
       lastPt = p;
     });
-    window.addEventListener('pointerup', () => { if (drawingPad) { drawingPad = false; predictPad(); } });
+    window.addEventListener('pointerup', () => {
+      if (!drawingPad) return;
+      drawingPad = false;
+      predictPad();
+      if (duelPendingClear) { duelPendingClear = false; setTimeout(clearPad, 150); }
+    });
     function strokePad(a, b) {
       pbctx.strokeStyle = '#fff';
       pbctx.lineWidth = 20;
@@ -318,6 +323,8 @@
       // downscale the 224px pad to the 20x20 the network expects
       const img = imageFromCanvas(padBuf, S);
       paintTile(smallCanvas, img, S, S, { raw: true });
+      let ink = 0;
+      for (let i = 0; i < img.length; i++) ink += img[i];
 
       const probs = softmax(net.forward(img));
       const best = argmax(probs);
@@ -328,7 +335,7 @@
       });
       document.getElementById('pad-verdict').innerHTML =
         `I think that's a <b>${best}</b> <span class="muted">(${(probs[best] * 100).toFixed(1)}% confident)</span>`;
-      duelCheck(probs, best);
+      duelCheck(probs, best, ink);
       drawFeatureMaps();
     }
 
@@ -361,7 +368,7 @@
        any accuracy number, because your handwriting is not in its training set.
        ------------------------------------------------------------------- */
     const DUEL_SECONDS = 60;
-    let duel = null;
+    let duel = null, duelPendingClear = false;
     const duelTarget = document.getElementById('duel-target');
     const duelScore = document.getElementById('duel-score');
     const duelTimer = document.getElementById('duel-timer');
@@ -380,6 +387,7 @@
     }
 
     function startDuel() {
+      duelPendingClear = false;
       duel = { target: 0, score: 0, ends: performance.now() + DUEL_SECONDS * 1000, done: false };
       nextTarget();
       clearPad();
@@ -414,15 +422,23 @@
     });
     showBest();
 
-    /** Called after every prediction; scores a hit when the network is convinced. */
-    function duelCheck(probs, best) {
+    /**
+     * Called after every prediction; scores a hit when the network is convinced.
+     * `ink` guards against the blank pad: a network will happily name a digit
+     * when shown an empty square, and that must not count as a point.
+     */
+    function duelCheck(probs, best, ink) {
       if (!duel || duel.done) return;
+      if (ink < 5) return;
       if (best === duel.target && probs[best] > 0.6) {
         duel.score++;
         duelScore.textContent = String(duel.score);
         duelMsg.innerHTML = `<span style="color:var(--good)">Yes — that's a ${best}.</span>`;
         nextTarget();
-        setTimeout(clearPad, 180);
+        // Wait for the pen to come up: clearing mid-stroke leaves the tail of
+        // the stroke behind on the fresh pad.
+        if (drawingPad) duelPendingClear = true;
+        else setTimeout(clearPad, 180);
       }
     }
 
