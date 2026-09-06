@@ -116,7 +116,8 @@
       Same generated digits as the CNN lesson, so the comparison is fair. Train it, then click around
       the image: the purple overlay shows where the attention flows. Before training the maps are
       near-uniform noise — every patch mildly interested in everything. After training they get
-      structure.
+      structure. Expect roughly 60% after thirty seconds, 85% or so after two minutes — slower than
+      the CNN, and that gap is the lesson rather than a defect.
     </p>
 
     <div class="split">
@@ -174,8 +175,9 @@
             Two real design choices, switchable. The <b>class token</b> is an extra learned token that
             attends to every patch and whose output feeds the classifier — the arrangement used by the
             ViT paper. The alternative simply averages the patch tokens. <b>LayerNorm</b> normalises
-            each token before each block; without it a deeper stack becomes hard to train, though at
-            this size you may find it costs more than it gives.
+            each token before each block, which is what makes deep stacks trainable at all.
+            Both default to <em>off</em> here, because at this size both measurably slow learning
+            down. Turn them on and see for yourself — that comparison is the point.
           </div>
         </div>
       </div>
@@ -218,10 +220,17 @@
     </p>
     <div class="note good">
       <b class="label">What's missing here, honestly</b>
-      <p class="mb0">A production ViT has multiple attention heads per layer (this has one), a dozen
-      or more stacked blocks (this has one), layer normalisation before each block, dropout, and a
-      dedicated classification token instead of averaging. Each is a fix for a real problem that
-      appears at scale. What's on this page is the load-bearing idea with the scaffolding removed.</p>
+      <p>A production ViT has multiple attention heads per layer (this has one), a dozen or more
+      stacked blocks (this has one), dropout, and a training run measured in GPU-months. What's on
+      this page is the load-bearing idea with the scaffolding removed — and it does genuinely learn,
+      passing 85% on ten classes given a couple of minutes. Worth holding next to the CNN, which
+      reaches 99% on the same data in about twenty seconds.</p>
+      <p class="mb0">The two switches above are worth taking seriously as a lesson in themselves.
+      A class token and LayerNorm are both standard, both unambiguously correct at scale, and both
+      make <em>this</em> model learn measurably slower — on a fixed 30-second budget, averaging the
+      patches with no normalisation beat the textbook arrangement by more than ten points. Machinery
+      that is essential for a 12-block model on a hundred million images is overhead for a 1-block
+      model on three thousand. "Best practice" is always best practice <em>at some scale</em>.</p>
     </div>
   </div>
 
@@ -231,9 +240,13 @@
       <li><strong>Look at the attention before training, then after.</strong> Untrained maps are flat
         — every patch attends to everything about equally. Trained maps concentrate. That change is
         the model deciding what's worth looking at.</li>
-      <li><strong>Switch to "average attention received".</strong> After training, the bright patches
+      <li><strong>Watch "what the classifier reads" after training.</strong> The bright patches
         usually sit on the digit's strokes rather than the empty background. Nobody labelled the
         strokes; attention found them because they carry the information.</li>
+      <li><strong>Turn the class token and LayerNorm on, and time it.</strong> Give each combination
+        the same thirty seconds from a fresh reset and compare test accuracy. You are running an
+        ablation study — the same experiment, and the same reasoning, that decides what goes into a
+        real architecture.</li>
       <li><strong>Set patches to 10×10 (a 2×2 grid).</strong> Four tokens is nearly no spatial
         resolution and accuracy collapses. Then try 2×2 patches: 100 tokens, far more attention
         arithmetic, slower training — and not obviously better at this size.</li>
@@ -244,6 +257,9 @@
       <li><strong>Train, then set augmentation to 0 and regenerate.</strong> Watch the test accuracy
         jump — not because the model improved, but because the exam got easier. Always ask what a
         benchmark number is measuring.</li>
+      <li><strong>Drop the training images to 250, then push it to 6,000.</strong> (Press "New data"
+        after moving the slider.) The CNN barely notices; this model cares enormously. That gap is
+        the entire practical argument between the two architectures.</li>
     </ul>
   </div>
 

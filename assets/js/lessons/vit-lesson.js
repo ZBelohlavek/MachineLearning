@@ -15,7 +15,7 @@
     nextLinks(document.getElementById('next-links'), 'cnn', 'gridworld', '../');
 
     let patch = 4, dim = 24, lr = 0.004, batchSize = 16, aug = 1;
-    let useCLS = true, useNorm = true, trainSize = 3000;
+    let useCLS = false, useNorm = false, trainSize = 3000;
     let net, trainSet, testSet, running = false, seen = 0, epoch = 0;
     let current = null;               // the image currently being inspected
     let selected = 0;                 // which patch is the query
@@ -29,7 +29,7 @@
       selected = Math.floor(net.Tp / 2);            // a patch index, 0..Tp-1
       chart.clear();
       setStat('parameters', net.numParams().toLocaleString());
-      setStat('patches', `${net.grid}×${net.grid} + cls`);
+      setStat('patches', `${net.grid}×${net.grid}${net.useCLS ? ' + cls' : ''}`);
       buildPatchStrip();
       buildPosPanel();
       refreshAll();
@@ -332,13 +332,13 @@
     ], 4, (v) => { patch = v; build(); });
 
     pills(document.getElementById('arch-toggles'), [
-      { value: 'cls', label: 'Class token' },
       { value: 'mean', label: 'Average the patch tokens' },
-    ], 'cls', (v) => { useCLS = v === 'cls'; build(); });
+      { value: 'cls', label: 'Class token' },
+    ], 'mean', (v) => { useCLS = v === 'cls'; build(); });
     pills(document.getElementById('arch-toggles'), [
-      { value: 'norm', label: 'LayerNorm on' },
       { value: 'nonorm', label: 'LayerNorm off' },
-    ], 'norm', (v) => { useNorm = v === 'norm'; build(); });
+      { value: 'norm', label: 'LayerNorm on' },
+    ], 'nonorm', (v) => { useNorm = v === 'norm'; build(); });
 
     pills(document.getElementById('attn-mode'), [
       { value: 'cls', label: 'What the classifier reads' },

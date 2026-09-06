@@ -13,9 +13,10 @@
   #conv-in { cursor: crosshair; }
   #kernel-editor { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 230px; }
   #kernel-editor input { width: 100%; text-align: center; font-family: var(--mono); padding: 9px 4px; }
-  .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .mgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .mcell {
     display: flex; align-items: center; gap: 5px; justify-content: center;
+    min-width: 0; flex-wrap: wrap;
     background: var(--bg-soft); border: 1px solid var(--line-soft); border-radius: 7px;
     padding: 7px 4px; font-family: var(--mono); font-size: .72rem; color: var(--text-dim);
   }
@@ -31,6 +32,10 @@
   .bank-label { font-family: var(--mono); font-size: .73rem; color: var(--text-mute); margin-top: 5px; }
   .pool-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
   .pool-arrow { color: var(--text-mute); font-size: 1.4rem; }
+  @media (max-width: 520px) {
+    .mcell { font-size: .64rem; padding: 6px 2px; gap: 3px; }
+    #kernel-editor input { padding: 7px 2px; }
+  }
 </style>
 </head>
 <body>
