@@ -23,9 +23,6 @@
   .pbar .v { font-family: var(--mono); font-size: .74rem; color: var(--text-dim); text-align: right; }
   .pbar.best .d, .pbar.best .v { color: var(--good); font-weight: 700; }
   .pbar.best .track i { background: var(--good); }
-  .chip { display: inline-block; font-family: var(--mono); font-size: .74rem; color: var(--text-dim);
-          background: var(--bg-soft); border: 1px solid var(--line-soft); border-radius: 999px;
-          padding: 3px 10px; margin: 3px 4px 0 0; }
   .chip b { color: var(--accent-2); }
   .qkv { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 16px 0; }
   .qkv .panel b { color: var(--accent-2); }
@@ -119,6 +116,8 @@
       structure. Expect roughly 60% after thirty seconds, 85% or so after two minutes — slower than
       the CNN, and that gap is the lesson rather than a defect.
     </p>
+
+    <div id="model-banner" class="note"></div>
 
     <div class="split">
       <div class="panel">
@@ -270,6 +269,7 @@
 <script src="../assets/js/lib/cnn.js"></script>
 <script src="../assets/js/lib/vit.js"></script>
 <script src="../assets/js/lib/digits.js"></script>
+<script src="../assets/models/vit-digits.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
 <script src="../assets/js/lessons/vit-lesson.js"></script>

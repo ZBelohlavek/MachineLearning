@@ -4,7 +4,7 @@
 
 ;(function () {
   'use strict';
-  const { LESSONS, chrome, hidpi, rafLoop, mulberry32 } = window.ML;
+  const { LESSONS, BADGES, chrome, hidpi, rafLoop, mulberry32, badgesEarned } = window.ML;
 
   const THUMB = {
     /* a decision boundary with two clouds of points */
@@ -130,6 +130,36 @@
       ctx.fill();
     },
 
+    /* a winding track with a pack of cars on it */
+    racer(ctx, W, H) {
+      ctx.fillStyle = '#0c1220';
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#2c3a55';
+      ctx.lineWidth = H * 0.20;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(W * 0.1, H * 0.78);
+      ctx.bezierCurveTo(W * 0.32, H * 0.78, W * 0.3, H * 0.24, W * 0.52, H * 0.26);
+      ctx.bezierCurveTo(W * 0.74, H * 0.28, W * 0.68, H * 0.8, W * 0.92, H * 0.7);
+      ctx.stroke();
+      const dots = [[0.18, 0.76, '#7c5cff'], [0.27, 0.66, '#7c5cff'], [0.36, 0.42, '#7c5cff'],
+                    [0.47, 0.28, '#38d39f'], [0.6, 0.34, '#7c5cff'], [0.7, 0.6, '#7c5cff']];
+      for (const [x, y, col] of dots) {
+        ctx.fillStyle = col;
+        ctx.globalAlpha = col === '#38d39f' ? 1 : 0.55;
+        ctx.fillRect(x * W - 5, y * H - 3, 10, 6);
+      }
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(255,209,102,.55)';
+      ctx.lineWidth = 1;
+      for (const a of [-0.6, -0.2, 0.2, 0.6]) {
+        ctx.beginPath();
+        ctx.moveTo(0.47 * W, 0.28 * H);
+        ctx.lineTo(0.47 * W + Math.cos(a - 0.3) * 34, 0.28 * H + Math.sin(a - 0.3) * 34);
+        ctx.stroke();
+      }
+    },
+
     /* the arena, with a ball trail */
     rocket(ctx, W, H) {
       const g = ctx.createLinearGradient(0, 0, W, H);
@@ -168,6 +198,29 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     chrome('home', '');
+
+    /* ---- progress across the whole course ---- */
+    const earned = badgesEarned();
+    const nEarned = BADGES.filter((b) => earned[b.id]).length;
+    const strip = document.getElementById('progress-strip');
+    if (strip) {
+      strip.className = 'progress-strip';
+      strip.innerHTML = `
+        <span class="count">${nEarned} / ${BADGES.length} badges</span>
+        <span class="track"><i style="width:${(nEarned / BADGES.length) * 100}%"></i></span>
+        <span class="muted" style="font-size:.82rem">
+          ${nEarned === 0 ? 'Badges unlock when a model of yours actually works.'
+            : nEarned === BADGES.length ? 'Every badge earned. Genuinely well done.'
+            : 'Kept in this browser only.'}
+        </span>
+        ${nEarned ? '<button class="small reset" id="reset-badges">Reset</button>' : ''}`;
+      const reset = document.getElementById('reset-badges');
+      if (reset) reset.addEventListener('click', () => {
+        localStorage.removeItem('mlbb-badges');
+        location.reload();
+      });
+    }
+
     const host = document.getElementById('lesson-cards');
     for (const l of LESSONS) {
       const a = document.createElement('a');
@@ -180,6 +233,12 @@
         <div class="tag-row">
           ${l.tags.map(([cls, t]) => `<span class="tag ${cls}">${t}</span>`).join('')}
           <span class="tag">${l.time}</span>
+        </div>
+        <div class="badge-row">
+          ${BADGES.filter((b) => b.lesson === l.id).map((b) => `
+            <span class="badge ${earned[b.id] ? 'earned' : ''}" title="${earned[b.id] ? b.label : b.hint}">
+              <i>${earned[b.id] ? '★' : '☆'}</i>${earned[b.id] ? b.label : b.hint}
+            </span>`).join('')}
         </div>`;
       host.appendChild(a);
     }

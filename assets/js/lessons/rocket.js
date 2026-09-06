@@ -9,8 +9,8 @@
   const {
     F, ACTIONS, ACTION_LABELS, OBS_SIZE, DEFAULT_REWARDS, REWARD_PRESETS,
     Arena, scriptedAction, Trainer, DEFAULT_HP,
-    hidpi, fit, LineChart, diverging, heat, softmax, argmax, sampleFrom,
-    chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop,
+    hidpi, fit, LineChart, diverging, heat, softmax, argmax, sampleFrom, clamp, MLP,
+    chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop, achieve,
   } = window.ML;
 
   const COL = {
@@ -206,7 +206,7 @@
         const probs = softmax(T.policy.forward(this.obs[i]));
         if (i === 0) {
           this.lastProbs = Float32Array.from(probs);
-          this.lastValue = T.value.forward(this.obs[i])[0];
+          this.lastValue = T.value ? T.value.forward(this.obs[i])[0] : null;
           this.lastAct = T.policy.activations.map((x) => Float32Array.from(x));
         }
         return greedy ? argmax(probs) : sampleFrom(probs);
@@ -241,7 +241,12 @@
         this.trail.push({ x: a.ball.x, y: a.ball.y });
         if (this.trail.length > 26) this.trail.shift();
         if (a.done) {
-          if (a.scorer >= 0) { this.score[a.scorer]++; this.flash = 1.4; this.flashTeam = a.scorer; }
+          if (a.scorer >= 0) {
+            this.score[a.scorer]++;
+            this.flash = 1.4;
+            this.flashTeam = a.scorer;
+            if (this.onGoal) this.onGoal(a.scorer, this.mode);
+          }
           a.spread = this.spreadOverride ?? 1;
           a.reset();
           this.trail.length = 0;
@@ -291,7 +296,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     chrome('rocket', '../');
-    nextLinks(document.getElementById('next-links'), 'gridworld', null, '../');
+    nextLinks(document.getElementById('next-links'), 'racer', null, '../');
 
     /* --- shared reward weights, edited by the user, used everywhere --- */
     const rewards = { ...DEFAULT_REWARDS };
@@ -429,11 +434,139 @@
     });
 
     /* ==================================================================
+       PANEL 2.5 — the training timelapse.
+
+       Live training is the honest experience, but it asks for patience before
+       anything interesting happens. These are checkpoints from a full run
+       trained offline by tools/train-rocket.cjs: drag through them and watch
+       three thousand episodes of learning in a few seconds.
+       ================================================================== */
+    const stagesData = window.ML_ROCKET_STAGES;
+    const tlBody = document.getElementById('timelapse-body');
+
+    if (!stagesData) {
+      tlBody.innerHTML =
+        '<p class="muted">The pre-trained checkpoints are missing. Run ' +
+        '<code>node tools/train-rocket.cjs</code> to generate them — or skip this and train ' +
+        'an agent yourself in the next section.</p>';
+    } else {
+      const stages = stagesData.stages;
+      const stageAgent = {
+        policy: null, value: null,
+        hp: { actionRepeat: (stagesData.hp && stagesData.hp.actionRepeat) || 2 },
+      };
+      const stageMatch = new Match(document.getElementById('stage-canvas'), {
+        trainer: stageAgent, mode: 'selfplay', rewards,
+      });
+      stageMatch.active = true;
+      stageMatch.greedy = false;
+
+      // Two charts rather than one: a rate between 0 and 1 and a count that
+      // reaches double figures do not share an axis usefully.
+      const stageChart = new LineChart(document.getElementById('stage-chart'), {
+        height: 120, xLabel: 'episodes', yMin: 0, yMax: 1,
+        series: [{ name: 'episodes ending in a goal', color: '#38d39f' }],
+      });
+      const stageChart2 = new LineChart(document.getElementById('stage-chart2'), {
+        height: 120, xLabel: 'episodes', yMin: 0,
+        series: [{ name: 'ball touches per episode', color: '#ffb547' }],
+      });
+      for (const row of stagesData.curve || []) {
+        stageChart.push(row.e, [row.g]);
+        stageChart2.push(row.e, [row.t]);
+      }
+
+      const label = document.getElementById('stage-label');
+      const detail = document.getElementById('stage-detail');
+      const scrub = document.getElementById('stage-scrub');
+      scrub.max = String(stages.length - 1);
+
+      let stageIndex = 0;
+      function showStage(i) {
+        stageIndex = clamp(i, 0, stages.length - 1);
+        const st = stages[stageIndex];
+        stageAgent.policy = window.ML.MLP.fromJSON(st.policy);
+        stageMatch.score = [0, 0];
+        stageMatch.arena.reset();
+        scrub.value = String(stageIndex);
+        label.innerHTML =
+          `<b>${st.label}</b> <span class="muted">— after ${st.episodes.toLocaleString()} episodes ` +
+          `of self-play</span>`;
+        detail.innerHTML =
+          `<span class="chip">goal rate <b>${(st.goalRate * 100).toFixed(0)}%</b></span>` +
+          `<span class="chip">touches/ep <b>${st.touches.toFixed(1)}</b></span>` +
+          `<span class="chip">entropy <b>${st.entropy.toFixed(2)}</b></span>` +
+          `<span class="chip">vs scripted bot <b>${st.vsScripted.scored}–${st.vsScripted.conceded}</b></span>` +
+          `<span class="chip">empty net <b>${st.emptyNet}/20</b></span>`;
+        stageChart.marker = st.episodes;
+        stageChart2.marker = st.episodes;
+        stageChart.draw();
+        stageChart2.draw();
+      }
+
+      scrub.addEventListener('input', () => showStage(+scrub.value));
+      document.getElementById('stage-prev').addEventListener('click', () => showStage(stageIndex - 1));
+      document.getElementById('stage-next').addEventListener('click', () => showStage(stageIndex + 1));
+
+      let playing = false, playTimer = 0;
+      const btnPlay = document.getElementById('stage-play');
+      btnPlay.addEventListener('click', () => {
+        playing = !playing;
+        btnPlay.textContent = playing ? '⏸ Pause timelapse' : '▶ Play the whole run';
+        btnPlay.classList.toggle('primary', !playing);
+        if (playing && stageIndex >= stages.length - 1) showStage(0);
+      });
+
+      pills(document.getElementById('stage-mode'), [
+        { value: 'selfplay', label: 'Against itself' },
+        { value: 'vs-scripted', label: 'Against the scripted bot' },
+        { value: 'solo', label: 'Empty net' },
+      ], 'selfplay', (v) => { stageMatch.mode = v; stageMatch.arena.reset(); });
+
+      document.getElementById('stage-adopt').addEventListener('click', () => {
+        trainer.policy = window.ML.MLP.fromJSON(stages[stageIndex].policy);
+        trainer.frozen = window.ML.MLP.fromJSON(stages[stageIndex].policy);
+        trainer.episodes = stages[stageIndex].episodes;
+        trainer.spread = stages[stageIndex].spread ?? 1;
+        // Badges are for agents you trained, so a borrowed policy disables them
+        // until you reset and do it yourself.
+        trainer.fromCheckpoint = true;
+        refreshStats();
+        flash(document.getElementById('stage-adopt-out'),
+              `Loaded the ${stages[stageIndex].episodes.toLocaleString()}-episode agent into the trainer below.`);
+      });
+
+      showStage(stages.length - 1);          // open on the finished agent
+
+      rafLoop((dt) => {
+        stageMatch.update(dt);
+        stageMatch.render();
+        if (playing) {
+          playTimer += dt;
+          if (playTimer > 3.5) {
+            playTimer = 0;
+            if (stageIndex >= stages.length - 1) {
+              playing = false;
+              btnPlay.textContent = '▶ Play the whole run';
+              btnPlay.classList.add('primary');
+            } else showStage(stageIndex + 1);
+          }
+        }
+      }).start();
+    }
+
+    /* ==================================================================
        PANEL 3 — training
        ================================================================== */
     const match = new Match(document.getElementById('train-canvas'), { rewards, trainer, mode: 'selfplay' });
     match.active = true;
     bindKeys(match);
+
+    match.onGoal = (team, mode) => {
+      if (mode === 'human' && team === 1) {
+        achieve('rocket-human', 'You scored against an agent you trained');
+      }
+    };
 
     const setStat = statGrid(document.getElementById('train-stats'), [
       'episodes', 'updates', 'goal rate', 'touches/ep', 'reward/ep', 'value error', 'difficulty', 'eps/sec',
@@ -473,6 +606,7 @@
     });
     btnReset.addEventListener('click', () => {
       trainer.reset(true);
+      trainer.fromCheckpoint = false;
       chartReward.clear(); chartSkill.clear(); chartLearn.clear();
       match.score = [0, 0];
       evalOut.textContent = '';
@@ -483,6 +617,9 @@
       setTimeout(() => {
         const vs = trainer.evaluate(20, 'scripted');
         const solo = trainer.evaluate(20, 'none');
+        if (vs.scored > vs.conceded && !trainer.fromCheckpoint) {
+          achieve('rocket-scores', `Beat the scripted bot ${vs.scored}–${vs.conceded} over 20 episodes`);
+        }
         evalOut.innerHTML =
           `<b>vs scripted bot:</b> won ${vs.scored} – ${vs.conceded} over 20 episodes ` +
           `(${vs.touchesPerEp.toFixed(1)} touches/ep) &nbsp;·&nbsp; ` +
@@ -550,6 +687,21 @@
       refreshStats();
       flash(document.getElementById('save-out'), 'Loaded a saved agent.');
     });
+    const btnPre = document.getElementById('btn-pretrained');
+    if (btnPre) {
+      if (!window.ML_ROCKET_STAGES) btnPre.disabled = true;
+      btnPre.addEventListener('click', () => {
+        const st = window.ML_ROCKET_STAGES.stages[window.ML_ROCKET_STAGES.stages.length - 1];
+        trainer.policy = MLP.fromJSON(st.policy);
+        trainer.frozen = MLP.fromJSON(st.policy);
+        trainer.episodes = st.episodes;
+        trainer.spread = 1;
+        trainer.fromCheckpoint = true;
+        refreshStats();
+        flash(document.getElementById('save-out'), 'Loaded the fully trained agent.');
+      });
+    }
+
     document.getElementById('btn-export').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(trainer.toJSON())], { type: 'application/json' });
       const a = document.createElement('a');
@@ -623,7 +775,8 @@
         c.el.classList.toggle('best', i === best);
       });
       const v = match.lastValue;
-      valueEl.innerHTML = `V(s) = <b>${v.toFixed(2)}</b> <span class="muted">— the critic's guess at
+      valueEl.innerHTML = v === null ? '' :
+        `V(s) = <b>${v.toFixed(2)}</b> <span class="muted">— the critic's guess at
         the total future reward from this exact moment</span>`;
     }
 
@@ -654,6 +807,9 @@
       if (!h) return;
       setStat('goal rate', h.scoreRate.toFixed(2), h.scoreRate > 0.5 ? 'good' : '');
       setStat('touches/ep', h.touches.toFixed(1));
+      if (h.touches >= 3 && training && !trainer.fromCheckpoint) {
+        achieve('rocket-touch', `${h.touches.toFixed(1)} touches per episode`);
+      }
       setStat('reward/ep', h.reward.toFixed(1), h.reward > 0 ? 'good' : 'bad');
       setStat('value error', h.valueLoss.toFixed(1));
     }

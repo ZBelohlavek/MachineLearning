@@ -12,7 +12,7 @@
 ;(function () {
   'use strict';
   const { Conv2D, ReLU, MaxPool2, Flatten, FC, ConvNet,
-          mulberry32, softmax, argmax, clamp, hidpi, fit, LineChart, heat, diverging,
+          mulberry32, softmax, argmax, clamp, hidpi, fit, LineChart, heat, diverging, achieve,
           chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop,
           renderDigit, makeDigitSet, imageFromCanvas } = window.ML;
 
@@ -25,7 +25,21 @@
 
     let f1 = 8, f2 = 16, hiddenUnits = 32;
     let lr = 0.004, batchSize = 16, aug = 1;
-    let net, epoch = 0, seen = 0, running = false;
+    let net, epoch = 0, seen = 0, running = false, pretrained = false, fromScratch = true;
+
+    function updateBanner() {
+      const el = document.getElementById('model-banner');
+      if (!el) return;
+      el.innerHTML = pretrained
+        ? '<b class="label">This network arrives pre-trained</b><p class="mb0">It has already seen ' +
+          `${(seen || 0).toLocaleString()} generated digits, so you can draw one right now and it will ` +
+          'work. Everything below still trains live on top of that — press <b>Start over</b> for ' +
+          'random weights and the full from-scratch experience.</p>'
+        : '<b class="label">Starting from random weights</b><p class="mb0">Nothing has been learned ' +
+          'yet: the ten confidence bars are all about 10% and the drawing pad will be nonsense until ' +
+          'you press <b>Train the network</b>.</p>';
+      el.className = pretrained ? 'note good' : 'note warn';
+    }
     let trainSet, testSet;
     const rng = mulberry32(1234);
 
@@ -44,6 +58,21 @@
       l.push(new FC(hiddenUnits, 10, 'linear', rng));
       net = new ConvNet(l);
       net.conv1 = c1; net.conv2 = c2; net.pool1 = p1; net.pool2 = p2;
+      net.arch = { f1, f2, hiddenUnits, S };
+      window.__cnn = net;                      // used by tools/train-vision.cjs
+
+      // A pre-trained network ships with the site so the drawing pad works the
+      // moment the page opens. It is only loaded when the architecture on screen
+      // still matches the one it was trained with.
+      pretrained = false;
+      fromScratch = true;
+      const saved = window.ML_CNN_MODEL;
+      if (saved && saved.arch && saved.arch.f1 === f1 && saved.arch.f2 === f2 &&
+          saved.arch.hiddenUnits === hiddenUnits) {
+        try { net.loadJSON(saved.model); pretrained = true; fromScratch = false; epoch = saved.epoch || 0; seen = saved.seen || 0; }
+        catch (err) { console.warn('could not load the pre-trained CNN:', err); }
+      }
+      updateBanner();
       epoch = 0; seen = 0;
       chart.clear();
       setStat('parameters', net.numParams().toLocaleString());
@@ -86,6 +115,7 @@
       net.step(lr, 1 / size);
       cursor = end;
       seen += size;
+      if (pretrained && seen > (window.ML_CNN_MODEL?.seen || 0) + 2000) { pretrained = false; updateBanner(); }
       runningLoss += loss; runningCorrect += correct; runningCount += size;
     }
 
@@ -298,6 +328,7 @@
       });
       document.getElementById('pad-verdict').innerHTML =
         `I think that's a <b>${best}</b> <span class="muted">(${(probs[best] * 100).toFixed(1)}% confident)</span>`;
+      duelCheck(probs, best);
       drawFeatureMaps();
     }
 
@@ -323,6 +354,77 @@
       renderPad();
       predictPad();
     });
+
+    /* ------------------------- the digit duel -------------------------
+       A 60-second game: the network names a digit, you draw it, and it has to
+       recognise your handwriting. It is a much better test of the model than
+       any accuracy number, because your handwriting is not in its training set.
+       ------------------------------------------------------------------- */
+    const DUEL_SECONDS = 60;
+    let duel = null;
+    const duelTarget = document.getElementById('duel-target');
+    const duelScore = document.getElementById('duel-score');
+    const duelTimer = document.getElementById('duel-timer');
+    const duelMsg = document.getElementById('duel-msg');
+    const duelBest = document.getElementById('duel-best');
+    const bestKey = 'mlbb-duel-best';
+
+    function readBest() { return +(localStorage.getItem(bestKey) || 0); }
+    function showBest() { duelBest.textContent = readBest() ? `Best: ${readBest()}` : ''; }
+
+    function nextTarget() {
+      let d;
+      do { d = (Math.random() * 10) | 0; } while (duel && d === duel.target && Math.random() < 0.8);
+      duel.target = d;
+      duelTarget.textContent = d;
+    }
+
+    function startDuel() {
+      duel = { target: 0, score: 0, ends: performance.now() + DUEL_SECONDS * 1000, done: false };
+      nextTarget();
+      clearPad();
+      duelMsg.textContent = '';
+      duelScore.textContent = '0';
+      document.getElementById('btn-duel').textContent = 'Restart duel';
+      document.getElementById('duel-panel').classList.add('live');
+    }
+
+    function endDuel() {
+      duel.done = true;
+      document.getElementById('duel-panel').classList.remove('live');
+      const best = readBest();
+      if (duel.score > best) {
+        try { localStorage.setItem(bestKey, String(duel.score)); } catch (err) { /* private mode */ }
+      }
+      showBest();
+      duelMsg.innerHTML = `Time. You got <b>${duel.score}</b> past the network` +
+        (duel.score >= 8 ? ' — that is a properly good score.'
+         : duel.score >= 4 ? '. Try training it a little longer, or draw bigger.'
+         : '. If it is missing easy digits, it needs more training or more augmentation.');
+      if (duel.score >= 8) achieve('cnn-duel', `You scored ${duel.score} in the digit duel`);
+      duelTimer.style.width = '0%';
+      duel = null;
+    }
+
+    document.getElementById('btn-duel').addEventListener('click', startDuel);
+    document.getElementById('btn-duel-skip').addEventListener('click', () => {
+      if (!duel) return;
+      nextTarget();
+      clearPad();
+    });
+    showBest();
+
+    /** Called after every prediction; scores a hit when the network is convinced. */
+    function duelCheck(probs, best) {
+      if (!duel || duel.done) return;
+      if (best === duel.target && probs[best] > 0.6) {
+        duel.score++;
+        duelScore.textContent = String(duel.score);
+        duelMsg.innerHTML = `<span style="color:var(--good)">Yes — that's a ${best}.</span>`;
+        nextTarget();
+        setTimeout(clearPad, 180);
+      }
+    }
 
     /* ------------------------- confusion matrix ------------------------- */
     function drawConfusion(conf) {
@@ -386,8 +488,15 @@
       btnTrain.classList.toggle('primary', !running);
     });
     document.getElementById('btn-reset').addEventListener('click', () => {
-      build(); shuffleOrder(); buildFeatureTiles(); predictPad();
+      const keep = window.ML_CNN_MODEL;
+      window.ML_CNN_MODEL = null;              // force genuinely random weights
+      build();
+      window.ML_CNN_MODEL = keep;
+      epoch = 0; seen = 0;
+      shuffleOrder(); buildFeatureTiles(); predictPad();
       setStat('epoch', 0); setStat('images seen', 0);
+      setStat('train acc', '–'); setStat('test acc', '–'); setStat('loss', '–');
+      chart.clear(); chart.draw();
     });
 
     const cfg = document.getElementById('cnn-config');
@@ -418,6 +527,11 @@
     /* ------------------------- main loop ------------------------- */
     let sinceEval = 0;
     rafLoop(() => {
+      if (duel && !duel.done) {
+        const left = duel.ends - performance.now();
+        duelTimer.style.width = clamp(left / (DUEL_SECONDS * 1000), 0, 1) * 100 + '%';
+        if (left <= 0) endDuel();
+      }
       if (!running) return;
       const t0 = performance.now();
       while (performance.now() - t0 < 22) trainBatch();
@@ -435,6 +549,9 @@
           sinceEval = 0;
           const ev = evaluate();
           setStat('test acc', (ev.acc * 100).toFixed(1) + '%', ev.acc > 0.9 ? 'good' : '');
+          if (ev.acc >= 0.95 && fromScratch) {
+            achieve('cnn-trained', `${(ev.acc * 100).toFixed(1)}% test accuracy from random weights`);
+          }
           chart.push(seen, [trainAcc, ev.acc]);
           drawConfusion(ev.conf);
           drawMistakes(ev.wrong);

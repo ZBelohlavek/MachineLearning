@@ -8,7 +8,7 @@
 
 ;(function () {
   'use strict';
-  const { MLP, mulberry32, randn, clamp, hidpi, fit, LineChart,
+  const { MLP, mulberry32, randn, clamp, hidpi, fit, LineChart, achieve, heat,
           chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop } = window.ML;
 
   const rand = mulberry32(3);
@@ -122,6 +122,8 @@
       if (!train.length) { train = all.slice(); all.forEach((p) => (p.test = false)); }
     }
     function rebuild() {
+      minTestLoss = Infinity; trainLossAtMin = Infinity;
+      landTrail = []; landDirs = null;
       const sizes = [2, ...hidden.filter((h) => h > 0), 1];
       net = new MLP(sizes, { hidden: activation, out: 'linear', rand: mulberry32((Math.random() * 1e9) | 0) });
       epoch = 0;
@@ -129,6 +131,7 @@
       buildNeuronPanels();
       draw();
       report();
+      if (landCtx) computeLandscape();
     }
 
     const xbuf = new Float32Array(2);
@@ -217,6 +220,14 @@
 
       for (const p of all) {
         const isTest = p.test;
+        const wrong = (predict(p.x, p.y) > 0.5 ? 1 : 0) !== p.label;
+        if (wrong) {
+          ctx.beginPath();
+          ctx.arc(toPx(p.x), toPx(p.y), 8, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255,107,107,.85)';
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+        }
         ctx.beginPath();
         ctx.arc(toPx(p.x), toPx(p.y), 4.2, 0, Math.PI * 2);
         ctx.fillStyle = p.label ? '#ff9f45' : '#4da3ff';
@@ -225,6 +236,156 @@
         ctx.strokeStyle = isTest ? 'rgba(255,255,255,.85)' : 'rgba(0,0,0,.55)';
         ctx.stroke();
       }
+    }
+
+    /* ---------------- the loss landscape ----------------
+       Gradient descent is always drawn as a ball rolling into a valley. This is
+       that picture, computed live from your model and your data.
+
+       Slicing along two individual weights turns out to be dull — once the rest
+       of the network has fit the data, one neuron's weights barely matter and
+       the surface is flat. So this follows the standard recipe instead: take two
+       random directions in the *whole* weight space, walk along them, and colour
+       each point by the training loss there. The white line is the optimiser's
+       real trajectory projected onto that plane.
+       ---------------------------------------------------------------- */
+    const landCanvas = document.getElementById('landscape');
+    const LAND = 36;
+    let landCtx = null, landImg = null;
+    let landCentre = null, landDirs = null, landScale = 1, landTrail = [];
+
+    function weightVector() {
+      const out = [];
+      for (const l of net.layers) { out.push(...l.W); out.push(...l.b); }
+      return Float64Array.from(out);
+    }
+    function setWeights(vec) {
+      let k = 0;
+      for (const l of net.layers) {
+        for (let i = 0; i < l.W.length; i++) l.W[i] = vec[k++];
+        for (let i = 0; i < l.b.length; i++) l.b[i] = vec[k++];
+      }
+    }
+    function randomDirections(n) {
+      const mk = () => {
+        const d = Float64Array.from({ length: n }, () => randn(rand));
+        let norm = 0;
+        for (const v of d) norm += v * v;
+        norm = Math.sqrt(norm) || 1;
+        for (let i = 0; i < n; i++) d[i] /= norm;
+        return d;
+      };
+      const d1 = mk();
+      let d2 = mk();
+      // orthogonalise, so the two axes are not secretly the same direction
+      let dot = 0;
+      for (let i = 0; i < n; i++) dot += d1[i] * d2[i];
+      let norm = 0;
+      for (let i = 0; i < n; i++) { d2[i] -= dot * d1[i]; norm += d2[i] * d2[i]; }
+      norm = Math.sqrt(norm) || 1;
+      for (let i = 0; i < n; i++) d2[i] /= norm;
+      return [d1, d2];
+    }
+
+    function trainLoss() {
+      let loss = 0;
+      for (const p of train) {
+        xbuf[0] = p.x; xbuf[1] = p.y;
+        const q = sigmoid(net.forward(xbuf)[0]);
+        loss += -(p.label * Math.log(Math.max(q, 1e-9)) + (1 - p.label) * Math.log(Math.max(1 - q, 1e-9)));
+      }
+      return loss / Math.max(1, train.length);
+    }
+
+    function computeLandscape() {
+      if (!landCtx || !net) return;
+      const theta = weightVector();
+      const n = theta.length;
+      if (!landDirs || landDirs[0].length !== n) landDirs = randomDirections(n);
+      landCentre = theta;
+      let normTheta = 0;
+      for (const v of theta) normTheta += v * v;
+      landScale = Math.max(0.6, Math.sqrt(normTheta) * 0.55);   // sweep a real fraction of the weights
+
+      const grid = new Float64Array(LAND * LAND);
+      const probe = new Float64Array(n);
+      let lo = Infinity, hi = -Infinity;
+      for (let j = 0; j < LAND; j++) {
+        const b = ((j / (LAND - 1)) * 2 - 1) * landScale;
+        for (let i = 0; i < LAND; i++) {
+          const a = ((i / (LAND - 1)) * 2 - 1) * landScale;
+          for (let k = 0; k < n; k++) probe[k] = theta[k] + a * landDirs[0][k] + b * landDirs[1][k];
+          setWeights(probe);
+          const L = trainLoss();
+          grid[j * LAND + i] = L;
+          if (L < lo) lo = L;
+          if (L > hi) hi = L;
+        }
+      }
+      setWeights(theta);                                        // put the model back
+
+      // log scaling: loss spans orders of magnitude and a linear ramp hides the valley
+      const buf = landCtx.createImageData(LAND, LAND);
+      const ll = Math.log(lo + 1e-3), lh = Math.log(hi + 1e-3);
+      for (let k = 0; k < LAND * LAND; k++) {
+        const t = (Math.log(grid[k] + 1e-3) - ll) / Math.max(1e-6, lh - ll);
+        const c = heat(1 - t).match(/\d+/g);                   // bright = low loss
+        buf.data[k * 4] = +c[0]; buf.data[k * 4 + 1] = +c[1];
+        buf.data[k * 4 + 2] = +c[2]; buf.data[k * 4 + 3] = 255;
+      }
+      landImg = buf;
+      const el = document.getElementById('landscape-range');
+      if (el) el.textContent = `loss ${lo.toFixed(3)} – ${hi.toFixed(2)}`;
+      drawLandscape();
+    }
+
+    /** Project a stored weight vector onto the current slice. */
+    function project(vec) {
+      let a = 0, b = 0;
+      for (let k = 0; k < vec.length; k++) {
+        const d = vec[k] - landCentre[k];
+        a += d * landDirs[0][k];
+        b += d * landDirs[1][k];
+      }
+      return [a, b];
+    }
+
+    function drawLandscape() {
+      if (!landCtx || !landImg) return;
+      const off = landCanvas._buf || (landCanvas._buf = document.createElement('canvas'));
+      off.width = LAND; off.height = LAND;
+      off.getContext('2d').putImageData(landImg, 0, 0);
+      const W = landCtx._cssW, H = landCtx._cssH;
+      landCtx.imageSmoothingEnabled = true;
+      landCtx.clearRect(0, 0, W, H);
+      landCtx.drawImage(off, 0, 0, W, H);
+
+      const px = (a) => (a / landScale * 0.5 + 0.5) * W;
+      const py = (b) => (b / landScale * 0.5 + 0.5) * H;
+      const pts = landTrail.map(project);
+      if (pts.length > 1) {
+        landCtx.strokeStyle = 'rgba(255,255,255,.9)';
+        landCtx.lineWidth = 1.6;
+        landCtx.beginPath();
+        pts.forEach(([a, b], i) => (i ? landCtx.lineTo(px(a), py(b)) : landCtx.moveTo(px(a), py(b))));
+        landCtx.stroke();
+      }
+      landCtx.fillStyle = '#fff';
+      landCtx.beginPath();
+      landCtx.arc(px(0), py(0), 4.5, 0, Math.PI * 2);
+      landCtx.fill();
+      landCtx.strokeStyle = '#0a0f19';
+      landCtx.lineWidth = 1.5;
+      landCtx.stroke();
+    }
+
+    function initLandscape() {
+      if (!landCanvas) return;
+      landCanvas.style.width = '';
+      const w = landCanvas.clientWidth || 260;
+      landCtx = hidpi(landCanvas, w, w);
+      landDirs = null;
+      computeLandscape();
     }
 
     /* ---------------- what each hidden neuron learned ---------------- */
@@ -280,8 +441,19 @@
       }
     }
 
+    let minTestLoss = Infinity, trainLossAtMin = Infinity;
     function report() {
       const tr = metrics(train), te = metrics(test);
+
+      if (dataset === 'spiral' && te.acc >= 0.9 && epoch > 20) {
+        achieve('foundations-spiral', `${(te.acc * 100).toFixed(1)}% on held-out spiral points`);
+      }
+      // Overfitting: test loss has climbed well past its best while training loss kept falling.
+      if (te.loss < minTestLoss) { minTestLoss = te.loss; trainLossAtMin = tr.loss; }
+      else if (epoch > 60 && te.loss > minTestLoss * 1.4 && tr.loss < trainLossAtMin * 0.6) {
+        achieve('foundations-overfit',
+                `test loss ${minTestLoss.toFixed(2)} → ${te.loss.toFixed(2)} while training loss fell`);
+      }
       setStat('epoch', epoch);
       setStat('train loss', tr.loss.toFixed(3));
       setStat('test loss', te.loss.toFixed(3), te.loss > tr.loss * 1.6 && epoch > 30 ? 'bad' : '');
@@ -396,11 +568,19 @@
         chart.push(epoch, [m.tr.loss, m.te.loss]);
         chart.draw();
         draw();
-        if (frame++ % 3 === 0) drawNeurons();
+        landTrail.push(weightVector());
+        if (landTrail.length > 240) landTrail.shift();
+        if (frame % 3 === 0) drawNeurons();
+        // The surface itself shifts as training moves the other weights, so it
+        // is recomputed about once a second rather than every frame.
+        if (frame % 45 === 0) computeLandscape(); else drawLandscape();
+        frame++;
       }
     }).start();
 
     regenerate();
     drawNeurons();
+    initLandscape();
+    window.addEventListener('resize', initLandscape);
   });
 })();

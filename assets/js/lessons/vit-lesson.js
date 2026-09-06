@@ -4,7 +4,7 @@
 
 ;(function () {
   'use strict';
-  const { ViT, mulberry32, softmax, argmax, clamp, hidpi, LineChart, heat, diverging,
+  const { ViT, mulberry32, softmax, argmax, clamp, hidpi, LineChart, heat, diverging, achieve,
           chrome, nextLinks, slider, pills, statGrid, rafLoop,
           renderDigit, makeDigitSet, imageFromCanvas } = window.ML;
 
@@ -16,7 +16,22 @@
 
     let patch = 4, dim = 24, lr = 0.004, batchSize = 16, aug = 1;
     let useCLS = false, useNorm = false, trainSize = 3000;
-    let net, trainSet, testSet, running = false, seen = 0, epoch = 0;
+    let net, trainSet, testSet, running = false, seen = 0, epoch = 0, pretrained = false, fromScratch = true;
+    const trainedArch = { cls: false, mean: false };
+
+    function updateBanner() {
+      const el = document.getElementById('model-banner');
+      if (!el) return;
+      el.innerHTML = pretrained
+        ? '<b class="label">This transformer arrives pre-trained</b><p class="mb0">Its attention ' +
+          'maps are already meaningful, so the overlay below shows something real rather than noise. ' +
+          'Press <b>Start over</b> — or change any architecture setting — for random weights and the ' +
+          'from-scratch version.</p>'
+        : '<b class="label">Random weights</b><p class="mb0">Attention is currently near-uniform: ' +
+          'every patch is mildly interested in everything. That flat map is exactly what an untrained ' +
+          'transformer looks like, and it is worth a look before you train it.</p>';
+      el.className = pretrained ? 'note good' : 'note warn';
+    }
     let current = null;               // the image currently being inspected
     let selected = 0;                 // which patch is the query
     let attnMode = 'cls';
@@ -25,6 +40,18 @@
     /* ---------------------------------------------------------- model */
     function build() {
       net = new ViT({ imgSize: S, patch, dim, mlpHidden: dim * 2, classes: 10, rand: rng, useCLS, useNorm });
+      window.__vit = net;                      // used by tools/train-vision.cjs
+      net.arch = { patch, dim, useCLS, useNorm };
+
+      pretrained = false;
+      fromScratch = true;
+      const saved = window.ML_VIT_MODEL;
+      if (saved && saved.arch && saved.arch.patch === patch && saved.arch.dim === dim &&
+          saved.arch.useCLS === useCLS && saved.arch.useNorm === useNorm) {
+        try { net.loadJSON(saved.model); pretrained = true; fromScratch = false; seen = saved.seen || 0; epoch = saved.epoch || 0; }
+        catch (err) { console.warn('could not load the pre-trained ViT:', err); }
+      }
+      updateBanner();
       seen = 0; epoch = 0;
       selected = Math.floor(net.Tp / 2);            // a patch index, 0..Tp-1
       chart.clear();
@@ -68,6 +95,7 @@
       net.step(lr, 1 / size);
       runCount += size;
       seen += size;
+      if (pretrained && seen > (window.ML_VIT_MODEL?.seen || 0) + 3000) { pretrained = false; updateBanner(); }
       cursor = end;
     }
 
@@ -376,7 +404,15 @@
       btnTrain.textContent = running ? '⏸ Pause training' : '▶ Train the transformer';
       btnTrain.classList.toggle('primary', !running);
     });
-    document.getElementById('btn-reset').addEventListener('click', () => { build(); });
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      const keep = window.ML_VIT_MODEL;
+      window.ML_VIT_MODEL = null;
+      build();
+      window.ML_VIT_MODEL = keep;
+      seen = 0; epoch = 0;
+      setStat('train acc', '–'); setStat('test acc', '–');
+      refreshAll();
+    });
     document.getElementById('btn-regen').addEventListener('click', () => { regenerateData(); });
 
     /* ---------------------------------------------------- main loop */
@@ -395,6 +431,14 @@
           evalCountdown = 3;
           const te = evaluate();
           setStat('test acc', (te * 100).toFixed(1) + '%', te > 0.9 ? 'good' : '');
+          if (te >= 0.8 && fromScratch) {
+            achieve('vit-trained', `${(te * 100).toFixed(1)}% test accuracy on ten classes`);
+          }
+          // trying both pooling arrangements on the same task is an ablation study
+          trainedArch[useCLS ? 'cls' : 'mean'] = true;
+          if (trainedArch.cls && trainedArch.mean) {
+            achieve('vit-ablation', 'You compared a class token against mean pooling');
+          }
           chart.push(seen, [acc, te]);
         } else chart.push(seen, [acc, null]);
         chart.draw();

@@ -8,7 +8,7 @@
 ;(function () {
   'use strict';
   const { hidpi, fit, chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop, clamp,
-          mulberry32 } = window.ML;
+          mulberry32, achieve } = window.ML;
 
   const N = 48;                       // image is N x N, single channel, values 0..1
   const rand = mulberry32(11);
@@ -167,6 +167,7 @@
       inp.addEventListener('input', () => {
         const v = parseFloat(inp.value);
         kernel[i] = isFinite(v) ? v : 0;
+        achieve('conv-custom', 'You edited the kernel by hand');
         recompute();
       });
       kEditor.appendChild(inp);
@@ -386,9 +387,16 @@
       format: (v) => v.toFixed(0) + ' px/s', onInput: (v) => { speed = v; },
     });
 
+    let scannedRow = 0;
     function advance() {
       cursor.x++;
-      if (cursor.x >= N) { cursor.x = 0; cursor.y = (cursor.y + 1) % N; }
+      scannedRow++;
+      if (cursor.x >= N) {
+        cursor.x = 0;
+        cursor.y = (cursor.y + 1) % N;
+        if (scannedRow >= N) achieve('conv-scan', 'You scanned a full row of the image');
+        scannedRow = 0;
+      }
     }
 
     sizeCanvases();

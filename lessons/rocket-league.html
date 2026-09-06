@@ -185,7 +185,65 @@
 
   <!-- ============================================================ -->
   <div class="section">
-    <h2>Step 3 · How the learning actually works</h2>
+    <h2>Step 3 · Watch three thousand episodes in thirty seconds</h2>
+    <p>
+      Training an agent from scratch takes a few minutes of real time, and the first minute of it is
+      a car spinning in circles. So here is one prepared earlier: checkpoints saved at intervals
+      through a full training run, which you can scrub through like a video. Every one is the real
+      policy from that moment — the same network, playing live, with the weights it had after that
+      many episodes.
+    </p>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title">
+          <h3>Training timelapse</h3>
+          <span class="hint">drag the slider to move through the run</span>
+        </div>
+        <div id="timelapse-body">
+          <canvas id="stage-canvas" class="stage"></canvas>
+          <div id="stage-label" style="margin-top:12px;font-size:.95rem"></div>
+          <div id="stage-detail" style="margin-top:8px"></div>
+          <input type="range" id="stage-scrub" min="0" max="1" step="1" value="0" style="margin-top:14px">
+          <div class="controls" style="margin-top:12px">
+            <button id="stage-play" class="primary">▶ Play the whole run</button>
+            <button id="stage-prev" class="small">←</button>
+            <button id="stage-next" class="small">→</button>
+          </div>
+          <div style="margin-top:14px">
+            <div class="field"><label class="row"><span>Who is it playing?</span></label></div>
+            <div id="stage-mode"></div>
+          </div>
+          <div class="controls" style="margin-top:14px">
+            <button id="stage-adopt">Use this agent below ↓</button>
+            <span id="stage-adopt-out" class="muted" style="font-size:.82rem"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>The run this came from</h3></div>
+        <canvas id="stage-chart" class="fit"></canvas>
+        <canvas id="stage-chart2" class="fit" style="margin-top:10px"></canvas>
+        <p class="muted" style="font-size:.84rem;margin-top:12px">
+          The dashed line marks where you are. Notice the shape: almost nothing happens for hundreds
+          of episodes, then touches climb, and only after that do goals follow. Learning is not
+          gradual here — it is a sequence of skills unlocking in order, each one built on the last.
+        </p>
+        <div class="note" style="margin-top:14px">
+          <b class="label">Watch the failure modes go by</b>
+          <p class="mb0">Early stages are worth watching for longer than they deserve. There's a
+          period where the agent drives at the ball and pushes it <em>anywhere</em>, including into
+          its own net — the shaping reward for touching the ball is being collected, and the goal
+          reward hasn't outweighed it yet. That's an agent optimising exactly what you asked for.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Step 4 · How the learning actually works</h2>
     <p>
       The agent is a small neural network: 24 inputs, two hidden layers of 64 units, and 9 outputs —
       one score per action (three throttle settings × three steering settings). Softmax turns those
@@ -221,10 +279,12 @@
 
   <!-- ============================================================ -->
   <div class="section">
-    <h2>Step 4 · Train it</h2>
+    <h2>Step 5 · Train it yourself</h2>
     <p>
-      Press start and leave it running. Below is what to look for, roughly in the order it happens —
-      expect the first two phases within a minute or so on a modern laptop.
+      Now do it for real. Press start and leave it running: this is your machine, from random
+      weights, with no help. Below is what to look for, roughly in the order it happens — expect the
+      first two phases within a minute or so on a modern laptop. (In a hurry, or want a strong
+      opponent to play against? "Load trained agent" drops the finished policy straight in.)
     </p>
     <ul class="phase-list">
       <li><strong>Twitching (0–30s).</strong> Actions are near-uniform noise, the car spins on the
@@ -268,6 +328,7 @@
           <div id="opponent-mode"></div>
         </div>
         <div class="controls" style="margin-top:16px">
+          <button id="btn-pretrained" class="small">Load trained agent</button>
           <button id="btn-save" class="small">Save agent</button>
           <button id="btn-load" class="small">Load agent</button>
           <button id="btn-export" class="small">Export JSON</button>
@@ -312,7 +373,7 @@
 
   <!-- ============================================================ -->
   <div class="section">
-    <h2>Step 5 · Look inside the policy</h2>
+    <h2>Step 6 · Look inside the policy</h2>
     <p>
       This is the same network from the match above, drawn live. The left column is the observation,
       the middle two are the hidden layers, and the right is the raw action scores. Blue is negative,
@@ -339,14 +400,14 @@
 
   <!-- ============================================================ -->
   <div class="section">
-    <h2>Step 6 · Take it on yourself</h2>
+    <h2>Step 7 · Take it on yourself</h2>
     <p>
       Switch the match to <em>You vs agent</em> and drive the orange car with the arrow keys. Playing
       against your own agent tells you things no chart will: whether it defends, whether it panics
       near its own goal, whether it can be walked around the same way twice.
     </p>
     <div class="panel">
-      <div class="panel-title"><h3>Match settings</h3><span class="hint">applies to the arena in Step 4</span></div>
+      <div class="panel-title"><h3>Match settings</h3><span class="hint">applies to the arena in Step 5</span></div>
       <div id="play-mode"></div>
       <p class="muted" style="font-size:.82rem;margin-top:12px">
         Greedy mode removes the randomness and always plays the top-scoring action — that's how you'd
@@ -384,6 +445,7 @@
 <script src="../assets/js/lib/nn.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/models/rocket-stages.js"></script>
 <script src="../assets/js/lessons/rocket-env.js"></script>
 <script src="../assets/js/lessons/rocket-train.js"></script>
 <script src="../assets/js/lessons/rocket.js"></script>

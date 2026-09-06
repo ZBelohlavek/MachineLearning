@@ -149,6 +149,18 @@
         ctx.fillText(this.opts.xLabel, W - P.r, H - P.b + 5);
       }
 
+      // --- "you are here" marker ---
+      if (this.marker != null && n > 1) {
+        const mx = px(this.marker);
+        ctx.strokeStyle = 'rgba(255,209,102,.8)';
+        ctx.setLineDash([4, 3]);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(mx, P.t); ctx.lineTo(mx, H - P.b);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
       // --- series ---
       ctx.save();
       ctx.beginPath(); ctx.rect(P.l, P.t, plotW, plotH); ctx.clip();

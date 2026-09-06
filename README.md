@@ -21,18 +21,52 @@ python3 -m http.server 8000     # then open http://localhost:8000
 | **[Convolutions](lessons/convolutions.html)** | Slide a 3×3 kernel across an image and see every multiplication | Kernels, feature maps, padding, stride, pooling |
 | **[Train a CNN](lessons/cnn-digits.html)** | Train a convolutional net on generated digits, then draw one yourself | Conv layers, augmentation, confusion matrices, learned filters |
 | **[Vision Transformers](lessons/vision-transformer.html)** | Cut an image into patches and train a real attention model | Patch embeddings, queries/keys/values, attention maps, position embeddings |
-| **[Q-Learning](lessons/gridworld.html)** | Build a maze and watch a value table fill in square by square | States, actions, rewards, the Bellman update, exploration vs exploitation |
+| **[Q-Learning](lessons/gridworld.html)** | Build a maze, watch a value table fill in square by square, then race the agent through it | States, actions, rewards, the Bellman update, exploration vs exploitation |
+| **[Evolve a driver](lessons/evolve-a-driver.html)** | Watch sixty cars learn to drive a track you drew, then race the champion | Neuroevolution, fitness functions, selection and mutation, gradient-free learning |
 | **[Rocket League Bot](lessons/rocket-league.html)** | Design the reward function and train a self-play agent to score | Policy gradients, PPO, advantage estimation, reward shaping, self-play |
 
 The flagship is the last one: a top-down arena where a policy-gradient agent learns to drive, hit the
 ball and score by playing against itself. You choose the reward weights, the opponent and the
 hyperparameters, watch the training live, and then play against the result with the arrow keys.
 
+## Nothing to wait for
+
+Training from scratch is the honest experience, but it asks for patience before anything interesting
+happens, so the site ships pre-trained models and lets you skip ahead:
+
+- **A training timelapse.** Eleven checkpoints from a full 12,000-episode Rocket League run. Drag
+  the slider and each one plays live in the arena — random twitching, first accidental touches,
+  driving at the ball, aiming at the goal — with the recorded curve marking where you are. One
+  click loads any of them into the trainer to continue from.
+- **A pre-trained CNN** (99.3% test accuracy), so the drawing pad recognises your handwriting the
+  moment the page opens.
+- **A pre-trained Vision Transformer** (88.0%), so its attention maps show real structure rather
+  than noise before you have trained anything.
+
+Every one of them can be thrown away with a single button to get the full from-scratch experience,
+and badges only unlock for models you trained yourself.
+
+## Badges
+
+Fifteen of them, tracked in `localStorage` and shown on the home page. None are for clicking around:
+they unlock when a model of yours does something — evolves a car that finishes the course, trains a
+bot that beats the scripted opponent, catches a network overfitting, or scores 8 in the 60-second
+digit duel.
+
 ## What's actually in here
 
 All of the machine learning is written from scratch in plain JavaScript, and it's meant to be read:
 
 ```
+assets/models/
+  rocket-stages.js  11 policy checkpoints from a full self-play training run
+  cnn-digits.js     a CNN trained to 99.3% on generated digits
+  vit-digits.js     a small ViT trained to 88.0% on the same data
+
+tools/
+  train-rocket.cjs  trains the agent offline and writes the checkpoints
+  train-vision.cjs  trains the CNN and ViT in headless Chromium and exports them
+
 assets/js/lib/
   nn.js       Dense layers, backpropagation, Adam, softmax, seedable RNG
   cnn.js      Conv2D, ReLU, MaxPool2, Flatten, FC — with hand-written backward passes
@@ -48,8 +82,16 @@ assets/js/lessons/
   gridworld.js      Tabular Q-learning on an editable grid
   foundations.js    2D classification playground
   convolutions.js   Interactive kernel explorer
-  cnn-digits.js     CNN training, feature maps and the drawing pad
+  cnn-digits.js     CNN training, feature maps, the drawing pad and the digit duel
   vit-lesson.js     Patch embeddings, attention maps, position embeddings
+  racer.js          Track mask, BFS distance field, sensors and neuroevolution
+```
+
+Regenerating the shipped models:
+
+```bash
+node tools/train-rocket.cjs 12000          # ~11 minutes, no dependencies
+node tools/train-vision.cjs 100            # needs Playwright
 ```
 
 Every backward pass — dense, convolution, max pooling, softmax attention and layer norm — was checked
@@ -83,7 +125,12 @@ the maze, editing kernels, switching architectures) and fails on any console err
 - **No frameworks and no build step.** Each library file works either as a plain `<script>` (exports
   land on `window.ML`) or through `require()` in Node, which is how the gradient checks run.
 - **Everything trains live.** The CNN reaches ~99% test accuracy in about twenty seconds; the Rocket
-  League agent starts hitting the ball within a minute or two and scoring shortly after.
+  League agent starts hitting the ball within a minute or two and scoring shortly after. The
+  pre-trained models are a shortcut, never a substitute — each lesson still trains its own model in
+  front of you.
+- **Models ship as `.js`, not `.json`.** Browsers block `fetch()` on `file://` URLs, and this site is
+  meant to work when you double-click `index.html`, so each model assigns a global from a plain
+  `<script>` tag.
 - **Deliberate failure modes.** Every lesson ends with experiments designed to break the model in an
   instructive way: reward hacking, overfitting, collapsed exploration, learning rates that explode.
 

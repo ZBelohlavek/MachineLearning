@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evolve a driver from scratch · Learn ML by Building</title>
+<meta name="description" content="Watch sixty tiny neural networks learn to drive a racetrack by natural selection — then race the champion yourself.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  #track-canvas { width: 100%; border-radius: 12px; border: 1px solid var(--line); background: #0c1220; image-rendering: pixelated; }
+  .keycap-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: .85rem; color: var(--text-dim); }
+  .vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin: 20px 0; }
+  @media (max-width: 760px) { .vs { grid-template-columns: 1fr; } }
+  .vs .col { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .vs .col h4 { margin: 0 0 8px; font-size: .96rem; }
+  .vs .mid { text-align: center; color: var(--text-mute); font-family: var(--mono); font-size: .8rem; }
+  .vs ul { margin: 0; padding-left: 18px; }
+  .vs li { font-size: .87rem; }
+  .big-note { font-size: 1.02rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Reinforcement learning · a game you can win</div>
+    <h1>Evolve a driver from scratch</h1>
+    <p class="lead">
+      No gradients. No backpropagation. No teacher, no labels and no reward function to tune. Sixty
+      cars with random brains drive into a wall, the handful that got furthest have their brains
+      copied with small random changes, and the whole thing repeats. Within a couple of minutes
+      something is driving the track properly — and then you can race it.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>The whole algorithm, in five lines</h2>
+    <ol class="phase-list">
+      <li>Make a population of cars, each with a randomly wired brain.</li>
+      <li>Let them all drive until they crash or run out of time.</li>
+      <li>Score each one by how far along the track it got.</li>
+      <li>Keep the best few. Fill the next generation with copies of them, each nudged by a little
+        random noise.</li>
+      <li>Go back to step 2.</li>
+    </ol>
+    <p>
+      That's <strong>neuroevolution</strong>, and the striking thing is what it doesn't need. There's
+      no derivative anywhere — the network is never told which weight to change or in which
+      direction. Selection does all the work: bad brains stop reproducing.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Watch it happen</h2>
+    <p>
+      Purple cars are the population, green is the current leader with its sensors drawn, and grey
+      ones have crashed. The road is tinted by distance to the finish, so you can see the goal the
+      cars are unknowingly climbing toward. Generation one is a massacre. Give it twenty.
+    </p>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title">
+          <h3>The track</h3>
+          <span class="hint">turn on the brush below to draw your own</span>
+        </div>
+        <canvas id="track-canvas"></canvas>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-run" class="primary">▶ Evolve</button>
+          <button id="btn-restart" class="danger">Start over</button>
+        </div>
+        <div style="margin-top:14px">
+          <div class="field"><label class="row"><span>Mode</span></label></div>
+          <div id="mode-pills"></div>
+        </div>
+        <div id="race-panel" style="display:none;margin-top:14px">
+          <div class="keycap-row">
+            <kbd>↑</kbd> throttle <kbd>↓</kbd> brake <kbd>←</kbd> <kbd>→</kbd> steer
+            <button id="btn-race-again" class="small">Restart race</button>
+          </div>
+          <div id="race-readout" style="margin-top:10px;font-size:.92rem;color:var(--text-dim)"></div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="field"><label class="row"><span>Load a track</span></label></div>
+          <div id="track-presets"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>Progress</h3></div>
+        <div id="racer-stats"></div>
+        <canvas id="racer-chart" class="fit" style="margin-top:14px"></canvas>
+        <p class="muted" style="font-size:.82rem;margin-top:10px">
+          The green line is the best car in each generation, purple is the population average. The
+          gap between them <em>is</em> the selection pressure: the best are pulling ahead of the
+          crowd, and next generation the crowd is rebuilt from them.
+        </p>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <div class="panel-title">
+        <h3>Settings</h3>
+        <span class="hint">changing the population restarts evolution</span>
+      </div>
+      <div id="racer-config" class="split even" style="gap:6px 26px"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>What each car can actually perceive</h2>
+    <p>
+      Seven whisker sensors, each reporting how far the road continues in that direction, plus its
+      own speed. Eight numbers in, two out: how hard to turn and how hard to accelerate. The brain
+      between them is about ninety weights — smaller than a paragraph of text.
+    </p>
+    <p>
+      That is a brutally limited view of the world. The car cannot see the track layout, does not
+      know where the finish is, has no memory of the last corner, and has never been told what a
+      wall is. Everything it appears to know about racing is encoded in ninety numbers that were
+      selected, not designed.
+    </p>
+    <div class="note">
+      <b class="label">Fitness is reward shaping wearing a different hat</b>
+      <p class="mb0">The score here is "distance covered toward the finish, with a bonus for getting
+      there quickly". Every problem from the Rocket League lesson comes straight back: score only
+      the finish and nothing ever finishes; score raw distance travelled and cars learn to drive in
+      circles forever; score speed alone and they sprint into the first wall. The name changes from
+      <em>reward function</em> to <em>fitness function</em>; the difficulty does not.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Evolution or gradient descent?</h2>
+    <div class="vs">
+      <div class="col">
+        <h4 style="color:var(--good)">Evolution (this page)</h4>
+        <ul>
+          <li>Needs no gradient, so the score can be anything at all — including "did it finish",
+            which is not differentiable.</li>
+          <li>Trivially parallel: every car is independent.</li>
+          <li>Barely any maths to get wrong. This lesson's algorithm is about forty lines.</li>
+          <li>Scales badly with parameter count. Ninety weights, fine. Ninety million, hopeless.</li>
+        </ul>
+      </div>
+      <div class="mid">vs</div>
+      <div class="col">
+        <h4 style="color:var(--accent)">Policy gradients (Rocket League)</h4>
+        <ul>
+          <li>Uses every step of every episode, not just the final score, so it learns from far less
+            experience.</li>
+          <li>Follows a derivative, so it scales to networks with billions of weights.</li>
+          <li>Needs a differentiable objective and careful tuning — clipping, advantages, entropy.</li>
+          <li>Many more ways to fail silently.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="big-note">
+      The rule of thumb: <strong>few parameters and a messy objective favours evolution; many
+      parameters and a dense signal favours gradients.</strong> Both are on this site precisely so
+      you can feel the difference — this page learns a driver from a score at the end of each life,
+      while the Rocket League agent learns from a number arriving thirty times a second.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><strong>Set mutation to 0.01, then 0.5.</strong> Tiny mutations mean the population
+        improves smoothly and then stops — it can't reach anything far from where it started. Huge
+        mutations destroy good drivers as fast as they appear, and the best-car line saws up and
+        down. Somewhere in between is where evolution actually works.</li>
+      <li><strong>Set survivors to 2%.</strong> Only the single best car breeds, so the entire
+        population becomes near-copies of one driver. It converges fast, and then can't adapt when
+        you change the track — the diversity that made progress possible is gone.</li>
+      <li><strong>Draw a new corner while it's running.</strong> Turn on the brush, add a hairpin,
+        and watch the champions crash into the change. Their driving isn't general skill, it's a
+        habit that fit one specific track.</li>
+      <li><strong>Shrink the population to 10.</strong> Each generation is much faster but samples
+        far less of the space, so progress per generation collapses. Population size is a
+        compute-versus-exploration trade, and it's the same trade as batch size in the other lessons.</li>
+      <li><strong>Evolve on the Circuit, then switch to the Grand tour without restarting.</strong>
+        Watch how much of the skill survives. Transfer is a genuine research problem, and this is
+        the cheapest demonstration of it you'll ever run.</li>
+      <li><strong>Race the champion, and lose.</strong> Then look at how it does it: it barely
+        steers on straights and turns hard exactly at the apex, because everything else got selected
+        out. It isn't driving well — it's driving in the only way that survived.</li>
+    </ul>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lessons/racer.js"></script>
+</body>
+</html>

@@ -34,7 +34,7 @@
     {
       id: 'cnn',
       href: 'lessons/cnn-digits.html',
-      nav: 'Train a CNN',
+      nav: 'CNNs',
       title: 'Build and train a digit CNN',
       blurb: 'Assemble a convolutional network layer by layer, train it in your browser on generated digits, then draw your own and watch every feature map light up.',
       tags: [['cv', 'vision'], ['', 'CNN'], ['', 'training']],
@@ -43,7 +43,7 @@
     {
       id: 'attention',
       href: 'lessons/vision-transformer.html',
-      nav: 'Vision Transformers',
+      nav: 'Transformers',
       title: 'Patches, attention and ViTs',
       blurb: 'Cut an image into patches, compute queries and keys yourself, and see the attention map that a Vision Transformer builds on top of them.',
       tags: [['cv', 'vision'], ['', 'attention'], ['', 'ViT']],
@@ -59,9 +59,18 @@
       time: '20 min',
     },
     {
+      id: 'racer',
+      href: 'lessons/evolve-a-driver.html',
+      nav: 'Evolution',
+      title: 'Evolve a driver from scratch',
+      blurb: 'Sixty cars, sixty tiny brains, no teacher. Watch a population learn to drive a track you drew — then race the champion yourself.',
+      tags: [['rl', 'game'], ['', 'neuroevolution'], ['', 'no gradients']],
+      time: '20 min',
+    },
+    {
       id: 'rocket',
       href: 'lessons/rocket-league.html',
-      nav: 'Rocket League Bot',
+      nav: 'Rocket League',
       title: 'Train a self-play Rocket League bot',
       blurb: 'The flagship project: design the rewards, train a policy-gradient agent by self-play in a top-down arena, and then take it on yourself.',
       tags: [['rl', 'RL'], ['', 'policy gradient'], ['', 'self-play']],
@@ -108,6 +117,84 @@
     if (n) out.push(`<a href="${base}${n.href}"><span>Next lesson</span>${n.title}</a>`);
     container.innerHTML = out.join('');
     container.className = 'next-links';
+  }
+
+  /* ==========================================================================
+     Badges — small goals that only unlock when a model actually works.
+     Stored in localStorage, shown on the home page and toasted when earned.
+     ========================================================================== */
+
+  const BADGES = [
+    { id: 'foundations-spiral', lesson: 'foundations', label: 'Untangled the spiral',
+      hint: 'Get 90% test accuracy on the spiral dataset' },
+    { id: 'foundations-overfit', lesson: 'foundations', label: 'Caught it overfitting',
+      hint: 'Make test loss climb while training loss keeps falling' },
+    { id: 'conv-custom', lesson: 'convolutions', label: 'Wrote your own kernel',
+      hint: 'Type your own numbers into the 3×3 kernel' },
+    { id: 'conv-scan', lesson: 'convolutions', label: 'Followed the window',
+      hint: 'Scan a whole row of the image one pixel at a time' },
+    { id: 'cnn-trained', lesson: 'cnn', label: 'Trained a CNN to 95%',
+      hint: 'Reach 95% test accuracy from random weights' },
+    { id: 'cnn-duel', lesson: 'cnn', label: 'Won a digit duel',
+      hint: 'Score 8 or more in the 60-second drawing challenge' },
+    { id: 'vit-trained', lesson: 'attention', label: 'Trained a transformer',
+      hint: 'Get the Vision Transformer past 80% test accuracy' },
+    { id: 'vit-ablation', lesson: 'attention', label: 'Ran an ablation',
+      hint: 'Try both the class token and mean pooling on the same task' },
+    { id: 'grid-solved', lesson: 'gridworld', label: 'Q-learning solved the maze',
+      hint: 'Let the agent find a route of 20 steps or fewer' },
+    { id: 'grid-beaten', lesson: 'gridworld', label: 'Beat the agent',
+      hint: 'Reach the goal yourself in fewer steps than the agent’s best' },
+    { id: 'racer-finish', lesson: 'racer', label: 'Evolved a finisher',
+      hint: 'Evolve a car that completes the course' },
+    { id: 'racer-beaten', lesson: 'racer', label: 'Outdrove the champion',
+      hint: 'Beat the evolved driver in a head-to-head race' },
+    { id: 'rocket-touch', lesson: 'rocket', label: 'It found the ball',
+      hint: 'Train until the agent averages 3 touches an episode' },
+    { id: 'rocket-scores', lesson: 'rocket', label: 'It learned to score',
+      hint: 'Train an agent that beats the scripted bot' },
+    { id: 'rocket-human', lesson: 'rocket', label: 'Scored on your own bot',
+      hint: 'Beat your trained agent in a head-to-head match' },
+  ];
+
+  const BADGE_KEY = 'mlbb-badges';
+
+  function loadBadges() {
+    try { return JSON.parse(localStorage.getItem(BADGE_KEY)) || {}; }
+    catch (err) { return {}; }
+  }
+
+  /** Award a badge. Safe to call repeatedly — only the first call counts. */
+  function achieve(id, detail) {
+    const badge = BADGES.find((b) => b.id === id);
+    if (!badge) return false;
+    const store = loadBadges();
+    if (store[id]) return false;
+    store[id] = { at: Date.now(), detail: detail || '' };
+    try { localStorage.setItem(BADGE_KEY, JSON.stringify(store)); } catch (err) { /* private mode */ }
+    toast(badge, detail);
+    return true;
+  }
+
+  function badgesEarned() { return loadBadges(); }
+
+  function toast(badge, detail) {
+    let host = document.querySelector('.toast-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.className = 'toast-host';
+      document.body.appendChild(host);
+    }
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = `<span class="medal">★</span><div><b>${badge.label}</b>` +
+      `<span>${detail || badge.hint}</span></div>`;
+    host.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('in'));
+    setTimeout(() => {
+      el.classList.remove('in');
+      setTimeout(() => el.remove(), 400);
+    }, 4200);
   }
 
   /* ------------------------- controls ------------------------- */
@@ -234,5 +321,6 @@
     };
   }
 
-  return { LESSONS, chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop, pointerPos };
+  return { LESSONS, BADGES, chrome, nextLinks, achieve, badgesEarned,
+           slider, pills, checkbox, statGrid, rafLoop, pointerPos };
 });

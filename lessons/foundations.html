@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="../assets/css/site.css">
 <style>
   #data-canvas { width: 100%; border-radius: 10px; border: 1px solid var(--line); cursor: crosshair; }
+  #landscape { width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #0a0f19; }
   .neuron-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 14px; }
   .neuron { border-radius: 6px; border: 1px solid var(--line-soft); image-rendering: pixelated; width: 44px; height: 44px; }
   .neuron-label { font-size: .74rem; letter-spacing: .07em; text-transform: uppercase; color: var(--text-mute); }
@@ -79,6 +80,7 @@
           <span><i style="background:#4da3ff"></i>class 0</span>
           <span><i style="background:#ff9f45"></i>class 1</span>
           <span><i style="background:#fff"></i>white outline = held-out test point</span>
+          <span><i style="background:transparent;box-shadow:0 0 0 1.5px #ff6b6b inset;border-radius:50%"></i>red ring = currently misclassified</span>
         </div>
       </div>
 
@@ -97,6 +99,21 @@
     </div>
 
     <div class="split" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-title">
+          <h3>The loss landscape</h3>
+          <span class="hint" id="landscape-range"></span>
+        </div>
+        <canvas id="landscape"></canvas>
+        <p class="muted" style="font-size:.82rem;margin:12px 0 0">
+          Two random directions through the network's entire weight space, swept across a grid and
+          coloured by the training loss found there — bright is low, dark is high. The white line is
+          the path training has actually taken, projected onto that plane, and the dot is where the
+          model is now. It is a two-dimensional window onto a 67-dimensional surface, so treat it as
+          a cross-section rather than a map: the real descent happens in every direction at once, and
+          this slice is recomputed as the other weights move.
+        </p>
+      </div>
       <div class="panel">
         <div class="panel-title"><h3>The dataset</h3></div>
         <div id="dataset-pills"></div>

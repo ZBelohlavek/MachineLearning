@@ -8,7 +8,7 @@
 
 ;(function () {
   'use strict';
-  const { hidpi, fit, LineChart, LineChart: _LC, chrome, nextLinks, slider, pills, checkbox,
+  const { hidpi, fit, LineChart, chrome, nextLinks, slider, pills, checkbox, achieve,
           statGrid, rafLoop, mulberry32, clamp } = window.ML;
 
   const EMPTY = 0, WALL = 1, GOAL = 2, PIT = 3, START = 4;
@@ -134,7 +134,7 @@
   /* ---------------------------------------------------------------- page */
   document.addEventListener('DOMContentLoaded', () => {
     chrome('gridworld', '../');
-    nextLinks(document.getElementById('next-links'), 'attention', 'rocket', '../');
+    nextLinks(document.getElementById('next-links'), 'attention', 'racer', '../');
 
     const GW = 11, GH = 8;
     const grid = new Grid(GW, GH);
@@ -189,7 +189,10 @@
         if (epSteps > 0) {
           chart.push(episode, [epSteps]);
           chartR.push(episode, [epReward]);
-          if (grid.get(pos.x, pos.y) === GOAL) bestRoute = Math.min(bestRoute, epSteps);
+          if (grid.get(pos.x, pos.y) === GOAL) {
+            bestRoute = Math.min(bestRoute, epSteps);
+            if (bestRoute <= 20) achieve('grid-solved', `A ${bestRoute}-step route, learned from nothing`);
+          }
         }
         agent.eps = Math.max(agent.epsMin, agent.eps * agent.epsDecay);
         newEpisode();
@@ -206,6 +209,67 @@
       totalSteps++;
       if (res.done || epSteps >= grid.maxSteps) done = true;
     }
+
+    /* ------------------------------- race the agent ---------------------
+       You play the same maze with the arrow keys. It is a surprisingly good
+       way to feel what the Q-table is worth: the agent needed thousands of
+       steps to learn a route you can see at a glance — and you cannot beat it
+       on a maze you have not looked at either.
+       -------------------------------------------------------------------- */
+    let racing = false, player = null, playerSteps = 0, raceMsg = '';
+
+    function startRace() {
+      racing = true;
+      running = false;
+      btnRun.textContent = '▶ Run';
+      btnRun.classList.add('primary');
+      player = { ...grid.startPos };
+      playerSteps = 0;
+      raceMsg = 'Use the arrow keys.';
+      updateRaceUI();
+      draw();
+    }
+
+    function movePlayer(dir) {
+      if (!racing || !player) return;
+      const res = grid.step(player, dir);
+      player = res.next;
+      playerSteps++;
+      if (res.done) {
+        const won = grid.get(player.x, player.y) === GOAL;
+        if (won) {
+          raceMsg = `Goal in ${playerSteps} steps. ` +
+            (bestRoute === Infinity ? 'The agent has not finished a run yet.'
+             : playerSteps < bestRoute ? `You beat the agent's best of ${bestRoute}.`
+             : `The agent's best is ${bestRoute}.`);
+          if (bestRoute !== Infinity && playerSteps < bestRoute) {
+            achieve('grid-beaten', `${playerSteps} steps against the agent's ${bestRoute}`);
+          }
+        } else raceMsg = `You fell in a pit after ${playerSteps} steps. The agent has done that too.`;
+        racing = false;
+      }
+      updateRaceUI();
+      draw();
+    }
+
+    function updateRaceUI() {
+      const el = document.getElementById('race-readout');
+      if (!el) return;
+      el.innerHTML = player
+        ? `<span class="chip">your steps <b>${playerSteps}</b></span>` +
+          `<span class="chip">agent's best <b>${bestRoute === Infinity ? '–' : bestRoute}</b></span>` +
+          (raceMsg ? ` <span style="color:var(--text-dim)">${raceMsg}</span>` : '')
+        : '';
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const dir = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3,
+                    w: 0, d: 1, s: 2, a: 3 }[e.key];
+      if (dir === undefined || !racing) return;
+      e.preventDefault();
+      movePlayer(dir);
+    });
+    document.getElementById('btn-race').addEventListener('click', startRace);
 
     /* ------------------------------- drawing ---------------------------- */
     function qColor(v, scale) {
@@ -294,6 +358,19 @@
           ctx.lineWidth = 1;
           ctx.strokeRect(px + .5, py + .5, cell - 1, cell - 1);
         }
+      }
+
+      if (player) {
+        ctx.save();
+        ctx.strokeStyle = '#ffd166';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 10;
+        ctx.strokeRect(player.x * cell + 4, player.y * cell + 4, cell - 8, cell - 8);
+        ctx.restore();
+        ctx.fillStyle = '#ffd166';
+        ctx.font = `${cell * 0.22}px ui-monospace, monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('YOU', player.x * cell + cell / 2, player.y * cell + cell * 0.78);
       }
 
       // the agent, sliding between squares
@@ -411,6 +488,8 @@
 
     function hardReset() {
       agent.reset();
+      player = null; racing = false; raceMsg = '';
+      updateRaceUI();
       agent.eps = 0.3;
       episode = 0; totalSteps = 0; bestRoute = Infinity;
       lastUpdate = null;

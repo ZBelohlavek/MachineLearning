@@ -332,6 +332,13 @@ table.data td { color: var(--text-dim); font-family: var(--mono); font-size: .82
 .bar-row .fill { position: absolute; top: 0; bottom: 0; left: 50%; background: var(--accent); border-radius: 4px; }
 .bar-row .num { font-family: var(--mono); color: var(--text); text-align: right; font-size: .78rem; }
 
+.chip {
+  display: inline-block; font-family: var(--mono); font-size: .74rem; color: var(--text-dim);
+  background: var(--bg-soft); border: 1px solid var(--line-soft); border-radius: 999px;
+  padding: 3px 10px; margin: 3px 5px 0 0;
+}
+.chip b { color: var(--text); }
+
 kbd {
   font-family: var(--mono); font-size: .76rem;
   background: var(--panel-2); border: 1px solid var(--line);
@@ -365,3 +372,50 @@ kbd {
 .mono { font-family: var(--mono); }
 .center { text-align: center; }
 .mt0 { margin-top: 0; } .mb0 { margin-bottom: 0; }
+
+/* ---------- badges and toasts ---------- */
+
+.toast-host {
+  position: fixed; right: 18px; bottom: 18px; z-index: 90;
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
+  pointer-events: none;
+}
+.toast {
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(135deg, #1b2537, #151d2e);
+  border: 1px solid rgba(56, 211, 159, .5);
+  border-radius: 12px; padding: 12px 16px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .5);
+  transform: translateY(14px); opacity: 0;
+  transition: transform .32s cubic-bezier(.2,.9,.3,1.2), opacity .32s ease;
+  max-width: 330px;
+}
+.toast.in { transform: translateY(0); opacity: 1; }
+.toast .medal {
+  width: 30px; height: 30px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: .95rem;
+  background: rgba(56, 211, 159, .16); color: var(--good);
+  border: 1px solid rgba(56, 211, 159, .45);
+}
+.toast b { display: block; font-size: .9rem; color: var(--text); }
+.toast span:not(.medal) { display: block; font-size: .78rem; color: var(--text-mute); margin-top: 2px; }
+
+.badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .72rem; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--text-mute); background: rgba(255,255,255,.02);
+}
+.badge.earned { border-color: rgba(56,211,159,.5); color: #8ee9c6; background: rgba(56,211,159,.10); }
+.badge i { font-style: normal; opacity: .8; }
+
+.progress-strip {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 14px 18px; margin: 22px 0 6px;
+}
+.progress-strip .track { flex: 1; min-width: 180px; height: 8px; background: var(--line-soft); border-radius: 5px; overflow: hidden; }
+.progress-strip .track i { display: block; height: 100%; width: 0; border-radius: 5px;
+  background: linear-gradient(90deg, var(--accent), var(--good)); transition: width .5s ease; }
+.progress-strip .count { font-family: var(--mono); color: var(--text); font-size: .9rem; }
+.progress-strip .reset { font-size: .78rem; }

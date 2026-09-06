@@ -26,10 +26,10 @@
         <span class="eyebrow">interactive · no installs · nothing pre-trained</span>
         <h1>Learn machine learning by building it</h1>
         <p class="lead">
-          Six lessons, each one a working model you train yourself in the browser. Design the reward
-          function for a Rocket League bot and watch it teach itself to score. Slide a convolution
-          kernel across an image by hand. Draw a digit and see every feature map in a network you
-          trained thirty seconds earlier.
+          Seven lessons, each one a working model you train yourself in the browser. Design the
+          reward function for a Rocket League bot and watch it teach itself to score. Evolve a
+          population of cars around a track you drew, then race the winner. Draw a digit and see
+          every feature map in a network you trained thirty seconds earlier.
         </p>
         <div class="controls" style="margin-top:22px">
           <a class="btn primary" href="lessons/foundations.html" style="text-decoration:none">Start at the beginning</a>
@@ -48,10 +48,16 @@
       machine does the training.</p>
     </div>
     <div class="panel">
-      <b>Nothing is pre-trained</b>
-      <p class="mb0" style="font-size:.9rem">Every model starts from random weights while you watch.
-      When the Rocket League agent scores, it's because it learned to, on your laptop, in the last
-      few minutes.</p>
+      <b>Skip the waiting, or don't</b>
+      <p class="mb0" style="font-size:.9rem">Trained models ship with the site, so the digit
+      recogniser works the instant you open it and the Rocket League run replays as a timelapse you
+      can scrub. One button throws them away for the full from-scratch version.</p>
+    </div>
+    <div class="panel">
+      <b>Badges for things that work</b>
+      <p class="mb0" style="font-size:.9rem">Fifteen of them, and none are for clicking around: they
+      unlock when a model of yours actually does something — evolves a car that finishes, trains a
+      bot that scores, catches a network overfitting.</p>
     </div>
     <div class="panel">
       <b>You are meant to break it</b>
@@ -65,6 +71,7 @@
     <h2>The lessons</h2>
     <span>in order, though each one stands alone</span>
   </div>
+  <div id="progress-strip"></div>
   <div class="card-grid" id="lesson-cards"></div>
 
   <div class="section">
@@ -74,10 +81,13 @@
       you came for one thing, jump straight to it:
     </p>
     <ul>
-      <li><strong>"I want the Rocket League bot."</strong> Go there directly, but read the
-        <a href="lessons/gridworld.html">Q-learning lesson</a> first if the words <em>reward</em>,
-        <em>policy</em> and <em>discount</em> are new — it's twenty minutes and the flagship lesson
-        assumes them.</li>
+      <li><strong>"I want the Rocket League bot."</strong> Go there directly — the timelapse at the
+        top shows the whole training run in half a minute. If the words <em>reward</em>,
+        <em>policy</em> and <em>discount</em> are new, the <a href="lessons/gridworld.html">Q-learning
+        lesson</a> first is twenty well-spent minutes.</li>
+      <li><strong>"I just want to play with something."</strong>
+        <a href="lessons/evolve-a-driver.html">Evolve a driver</a> needs no background at all: watch
+        sixty cars fail, then get good, then beat you in a race.</li>
       <li><strong>"I want to understand vision models."</strong> Convolutions → Train a CNN → Vision
         Transformers, in that order. The first is arithmetic you do by hand; the last is a real
         transformer with its attention maps exposed.</li>

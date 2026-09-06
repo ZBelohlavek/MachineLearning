@@ -155,6 +155,81 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- the racer, and its race mode ---- */
+  {
+    const page = await open('lessons/evolve-a-driver.html');
+    await scrollTo(page, '#track-canvas');
+    await page.click('#btn-run');
+    await page.waitForTimeout(9000);
+    const stats = await page.$$eval('#racer-stats .stat',
+      els => Object.fromEntries(els.map(e => [e.querySelector('.k').textContent, e.querySelector('.v').textContent])));
+    check('racer · evolution makes progress', parseInt(stats.generation, 10) > 2 && parseFloat(stats.best) > 20,
+          `(gen ${stats.generation}, best ${stats.best})`);
+    await page.click('#mode-pills .pill:text-is("Race the champion")');
+    await page.waitForTimeout(400);
+    await page.keyboard.down('ArrowUp');
+    await page.waitForTimeout(1800);
+    await page.keyboard.up('ArrowUp');
+    const race = await page.textContent('#race-readout');
+    check('racer · you can race the champion', /champion/.test(race) && /\d+%/.test(race));
+    await page.click('#track-presets .pill:text-is("Hairpin")');
+    await page.waitForTimeout(600);
+    check('racer · switching track restarts evolution', true);
+    await page.close();
+  }
+
+  /* ---- pre-trained models load and work with no training ---- */
+  {
+    const page = await open('lessons/cnn-digits.html');
+    check('cnn · ships a pre-trained network', /pre-trained/i.test(await page.textContent('#model-banner')));
+    await scrollTo(page, '#pad');
+    const box = await page.locator('#pad').boundingBox();
+    const P = (fx, fy) => ({ x: box.x + box.width * fx, y: box.y + box.height * fy });
+    let p = P(0.5, 0.15);
+    await page.mouse.move(p.x, p.y); await page.mouse.down();
+    p = P(0.5, 0.85); await page.mouse.move(p.x, p.y, { steps: 12 }); await page.mouse.up();
+    await page.waitForTimeout(400);
+    const verdict = await page.textContent('#pad-verdict');
+    check('cnn · recognises a drawn digit before any training', /that's a 1/.test(verdict), '→ ' + verdict.trim());
+    await page.click('#btn-duel');
+    await page.waitForTimeout(400);
+    check('cnn · the digit duel starts', /^[0-9]$/.test((await page.textContent('#duel-target')).trim()));
+    await page.close();
+  }
+
+  /* ---- the Rocket League timelapse ---- */
+  {
+    const page = await open('lessons/rocket-league.html');
+    const n = await page.evaluate(() => (window.ML_ROCKET_STAGES || {}).stages?.length || 0);
+    check('rocket · training checkpoints are shipped', n >= 5, `(${n} stages)`);
+    await scrollTo(page, '#stage-canvas');
+    await page.evaluate(() => { const s = document.querySelector('#stage-scrub'); s.value = '0'; s.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.waitForTimeout(400);
+    const first = await page.textContent('#stage-label');
+    await page.click('#stage-next');
+    await page.waitForTimeout(400);
+    const second = await page.textContent('#stage-label');
+    check('rocket · scrubbing swaps in a different policy', first !== second, '→ ' + second.replace(/\s+/g, ' ').trim());
+    await page.click('#btn-pretrained');
+    await page.waitForTimeout(300);
+    check('rocket · the trained agent loads into the trainer',
+          (await page.evaluate(() => window.__trainer.episodes)) > 1000);
+    await page.close();
+  }
+
+  /* ---- badges ---- */
+  {
+    const page = await open('lessons/convolutions.html');
+    await scrollTo(page, '#kernel-editor');
+    await page.fill('#kernel-editor input:first-child', '2');
+    await page.waitForTimeout(400);
+    const earned = await page.evaluate(() => JSON.parse(localStorage.getItem('mlbb-badges') || '{}'));
+    check('badges · editing a kernel earns one', !!earned['conv-custom']);
+    const toast = await page.locator('.toast').count();
+    check('badges · a toast appears', toast >= 1);
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();
