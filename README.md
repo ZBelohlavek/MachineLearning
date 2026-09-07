@@ -24,6 +24,7 @@ python3 -m http.server 8000     # then open http://localhost:8000
 | **[Q-Learning](lessons/gridworld.html)** | Build a maze, watch a value table fill in square by square, then race the agent through it | States, actions, rewards, the Bellman update, exploration vs exploitation |
 | **[Evolve a driver](lessons/evolve-a-driver.html)** | Watch sixty cars learn to drive a track you drew, then race the champion | Neuroevolution, fitness functions, selection and mutation, gradient-free learning |
 | **[Rocket League Bot](lessons/rocket-league.html)** | Design the reward function and train a self-play agent to score | Policy gradients, PPO, advantage estimation, reward shaping, self-play |
+| **[Final challenge](lessons/final-challenge.html)** | Pick the right approach for nine situations, then diagnose four training runs from their curves | Judgement: matching method to problem, and reading failure from a chart |
 
 The flagship is the last one: a top-down arena where a policy-gradient agent learns to drive, hit the
 ball and score by playing against itself. You choose the reward weights, the opponent and the
@@ -58,6 +59,10 @@ on the home page. None are for clicking around — each falls into one of three 
   your kernel's output against a Sobel-Y reference, so any scaling or sign flip of a real edge
   detector passes and clicking the preset does not. "Solve the spiral with 8 hidden neurons or
   fewer" is checked the same way, against held-out accuracy.
+- **A capstone.** Nine situations where one method fits and three are things people genuinely reach
+  for and regret, then four training runs shown only as curves — each the signature of a failure you
+  produced yourself earlier in the course. It is the only part of the site that tests whether the
+  ideas transfer.
 - **Quiz checkpoints.** Three questions at the end of every lesson, about what you just made happen
   rather than about terminology. The explanation appears whichever answer you pick, and says why the
   wrong answer was tempting — the questions live in `assets/js/lib/quizzes.js` so they can be read
@@ -96,6 +101,7 @@ assets/js/lessons/
   cnn-digits.js     CNN training, feature maps, the drawing pad and the digit duel
   vit-lesson.js     Patch embeddings, attention maps, position embeddings
   racer.js          Track mask, BFS distance field, sensors and neuroevolution
+  capstone.js       The final challenge: scenario picking and curve diagnosis
 ```
 
 Regenerating the shipped models:

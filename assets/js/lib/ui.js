@@ -76,6 +76,16 @@
       tags: [['rl', 'RL'], ['', 'policy gradient'], ['', 'self-play']],
       time: '40 min',
     },
+    {
+      id: 'capstone',
+      capstone: true,
+      href: 'lessons/final-challenge.html',
+      nav: 'Final Challenge',
+      title: 'The final challenge',
+      blurb: 'No sliders, no training — just judgement. Pick the right approach for nine real situations, then diagnose four training runs from their curves alone.',
+      tags: [['core', 'capstone'], ['', 'judgement'], ['', 'diagnosis']],
+      time: '15 min',
+    },
   ];
 
   /**
@@ -84,7 +94,7 @@
    * @param {string} base    path prefix back to the site root ('' or '../')
    */
   function chrome(active = 'home', base = '') {
-    const nav = LESSONS.map(
+    const nav = LESSONS.filter((l) => !l.capstone).map(
       (l) => `<a href="${base}${l.href}" class="${l.id === active ? 'active' : ''}">${l.nav}</a>`
     ).join('');
 
@@ -173,6 +183,10 @@
       hint: 'Answer all three questions correctly' },
     { id: 'quiz-rocket', lesson: 'rocket', label: 'Passed the quiz',
       hint: 'Answer all three questions correctly' },
+    { id: 'capstone-approach', lesson: 'capstone', label: 'Picked every approach correctly',
+      hint: 'Choose the right method for all nine situations' },
+    { id: 'capstone-diagnose', lesson: 'capstone', label: 'Diagnosed every training run',
+      hint: 'Read all four training curves correctly' },
   ];
 
   const BADGE_KEY = 'mlbb-badges';

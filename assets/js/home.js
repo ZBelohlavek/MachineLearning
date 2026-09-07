@@ -223,6 +223,7 @@
 
     const host = document.getElementById('lesson-cards');
     for (const l of LESSONS) {
+      if (l.capstone) continue;
       const a = document.createElement('a');
       a.className = 'card';
       a.href = l.href;
@@ -241,6 +242,27 @@
             </span>`).join('')}
         </div>`;
       host.appendChild(a);
+    }
+
+    // the capstone sits after the lessons, framed as the thing you do last
+    const capstone = LESSONS.find((l) => l.capstone);
+    const capHost = document.getElementById('capstone-card');
+    if (capstone && capHost) {
+      const done = BADGES.filter((b) => b.lesson === 'capstone');
+      const got = done.filter((b) => earned[b.id]).length;
+      capHost.innerHTML = `
+        <a class="card capstone" href="${capstone.href}">
+          <div class="cap-flag">Capstone</div>
+          <h3>${capstone.title}</h3>
+          <p>${capstone.blurb}</p>
+          <div class="badge-row">
+            ${done.map((b) => `<span class="badge ${earned[b.id] ? 'earned' : ''}">
+              <i>${earned[b.id] ? '★' : '☆'}</i>${earned[b.id] ? b.label : b.hint}</span>`).join('')}
+          </div>
+          <div class="muted" style="font-size:.82rem;margin-top:10px">
+            ${got === done.length ? 'Both parts complete.' : 'Thirteen decisions, no training, ' + capstone.time + '.'}
+          </div>
+        </a>`;
     }
 
     const paint = () => {

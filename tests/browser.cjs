@@ -334,6 +334,51 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await touchCtx.close();
   }
 
+  /* ---- the capstone ---- */
+  {
+    const page = await open('lessons/final-challenge.html');
+    await page.evaluate(() => { localStorage.removeItem('mlbb-capstone'); localStorage.setItem('mlbb-badges', '{}'); });
+    await page.reload();
+    await page.waitForTimeout(1400);
+    const shape = await page.evaluate(() => ({
+      approach: document.querySelectorAll('#approach-game .quiz-q').length,
+      curves: document.querySelectorAll('#curve-game .quiz-q').length,
+      canvases: document.querySelectorAll('.curve-canvas').length,
+    }));
+    check('capstone · nine situations and four drawn training curves',
+          shape.approach === 9 && shape.curves === 4 && shape.canvases === 4,
+          JSON.stringify(shape));
+    // discover the right answers by picking one, then reset and answer properly
+    await page.evaluate(() => {
+      const mark = (host) => [...document.querySelectorAll(host + ' .quiz-q')].forEach((card) => {
+        const opts = [...card.querySelectorAll('.quiz-opt')];
+        opts[0].click();
+        card.dataset.correct = opts.findIndex((o) => o.classList.contains('correct'));
+      });
+      mark('#approach-game'); mark('#curve-game');
+    });
+    await page.click('#approach-reset');
+    await page.click('#curve-reset');
+    await page.waitForTimeout(300);
+    const final = await page.evaluate(() => {
+      const solve = (host) => [...document.querySelectorAll(host + ' .quiz-q')].forEach(
+        (card) => card.querySelectorAll('.quiz-opt')[+card.dataset.correct].click());
+      solve('#approach-game'); solve('#curve-game');
+      return { a: document.querySelector('#approach-score').textContent,
+               c: document.querySelector('#curve-score').textContent,
+               badges: Object.keys(JSON.parse(localStorage.getItem('mlbb-badges') || '{}'))
+                 .filter((b) => b.startsWith('capstone')).length };
+    });
+    check('capstone · answering everything correctly earns both badges',
+          final.a === '9 / 9' && final.c === '4 / 4' && final.badges === 2,
+          `(${final.a}, ${final.c})`);
+    await page.reload();
+    await page.waitForTimeout(1200);
+    const kept = await page.evaluate(() => document.querySelector('#approach-score').textContent);
+    check('capstone · answers persist across a reload', kept === '9 / 9');
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();

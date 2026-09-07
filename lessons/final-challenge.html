@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The final challenge · Learn ML by Building</title>
+<meta name="description" content="Pick the right machine learning approach for nine real situations, then diagnose four training runs from their curves alone.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  .curve-canvas { width: 100%; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 14px; }
+  .game-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .game-head .quiz-score { font-size: 1rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Capstone · no training required</div>
+    <h1>The final challenge</h1>
+    <p class="lead">
+      Every other page on this site hands you sliders. This one hands you situations. Nothing here
+      trains, and there is nothing to watch converge — it is thirteen decisions of the kind that
+      actually decide whether a machine learning project works, and every one of them is something
+      you have already seen happen somewhere on this site.
+    </p>
+  </div>
+
+  <div id="lesson-goals"></div>
+
+  <div class="section">
+    <h2>Part one · Pick the approach</h2>
+    <p>
+      Nine situations. In each, one method fits and three are things people genuinely reach for and
+      regret. The explanation appears whichever you choose.
+    </p>
+    <div class="panel">
+      <div class="game-head">
+        <div>
+          <h3 style="margin:0">Choose the method</h3>
+          <p class="muted" style="margin:4px 0 0;font-size:.88rem">
+            Read the constraints before the question: how much data, what kind of feedback, how many
+            parameters. Those three almost always decide it.
+          </p>
+        </div>
+        <div class="quiz-score" id="approach-score">0 / 9</div>
+      </div>
+      <div id="approach-game"></div>
+      <div class="quiz-footer">
+        <span class="muted">Answers are kept in this browser.</span>
+        <button class="small" id="approach-reset">Reset part one</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Part two · Diagnose the run</h2>
+    <p>
+      Four training runs, shown only as curves. Each one is a failure you have already produced
+      yourself somewhere on this site — the shapes are the same, drawn cleanly so the signature is
+      unmistakable. Reading them quickly is most of what day-to-day machine learning work looks like.
+    </p>
+    <div class="panel">
+      <div class="game-head">
+        <div>
+          <h3 style="margin:0">What went wrong?</h3>
+          <p class="muted" style="margin:4px 0 0;font-size:.88rem">
+            Look at whether the curves agree with each other, whether either is still falling, and
+            whether anything is oscillating.
+          </p>
+        </div>
+        <div class="quiz-score" id="curve-score">0 / 4</div>
+      </div>
+      <div id="curve-game"></div>
+      <div class="quiz-footer">
+        <span class="muted">Answers are kept in this browser.</span>
+        <button class="small" id="curve-reset">Reset part two</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>If you got most of these</h2>
+    <p>
+      Then you have the thing this site was built to give you, which is not a list of architectures.
+      It is the habit of asking what kind of feedback a problem provides, how much of it there is,
+      and what a failure looks like before you have a name for it. Everything else — the specific
+      layer types, the current best optimiser, whichever architecture is fashionable this year — is
+      detail you can look up.
+    </p>
+    <div class="note good">
+      <b class="label">Where to go from here</b>
+      <p>
+        The code on this site is deliberately small and readable, and the most useful next step is to
+        change it rather than read more of it. Some suggestions that are genuinely within reach:
+      </p>
+      <ul style="margin-bottom:0">
+        <li>Add a second attention head to <code>assets/js/lib/vit.js</code> and see whether the
+          attention maps specialise.</li>
+        <li>Give the Rocket League cars a boost action — a fourth output and a fuel counter in the
+          observation — and watch how the reward shaping has to change with it.</li>
+        <li>Replace the racer's mutation with crossover between two parents, and measure whether it
+          actually helps on the Grand tour.</li>
+        <li>Swap the CNN's max pooling for average pooling and explain the accuracy difference from
+          what you know about what pooling throws away.</li>
+        <li>Add a fifth dataset to the foundations playground that no architecture on the page can
+          solve, and work out why.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lessons/capstone.js"></script>
+</body>
+</html>
