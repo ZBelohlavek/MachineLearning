@@ -274,7 +274,16 @@
       }
       drawing = true; drawAt(e);
     });
-    inCanvas.addEventListener('pointermove', (e) => { if (drawing) drawAt(e); });
+    inCanvas.addEventListener('pointermove', (e) => {
+      if (drawing) { drawAt(e); return; }
+      // While the scan is paused, the window simply follows the mouse — much
+      // faster to explore an image than clicking one position at a time.
+      if (playing || paintOn.get()) return;
+      const r = inCanvas.getBoundingClientRect();
+      const x = clamp(Math.floor(((e.clientX - r.left) / r.width) * N), 0, N - 1);
+      const y = clamp(Math.floor(((e.clientY - r.top) / r.height) * N), 0, N - 1);
+      if (x !== cursor.x || y !== cursor.y) { cursor.x = x; cursor.y = y; redraw(); }
+    });
     window.addEventListener('pointerup', () => { drawing = false; });
 
     const paintOn = checkbox(document.getElementById('draw-controls'), 'Draw on the image with the mouse', false, () => {});

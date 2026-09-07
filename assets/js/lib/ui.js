@@ -116,6 +116,41 @@
       </div>`;
     document.body.prepend(header);
 
+    /* A reading-progress bar. These pages are long and heavily sectioned, and a
+       thin line is enough to say how much is left without taking any space. */
+    const bar = document.createElement('div');
+    bar.className = 'read-bar';
+    bar.innerHTML = '<i></i>';
+    document.body.appendChild(bar);
+    const fill = bar.firstChild;
+    const onScroll = () => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      fill.style.width = (h > 0 ? Math.min(1, window.scrollY / h) * 100 : 0) + '%';
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    onScroll();
+
+    /* Sections fade in as they arrive. Applied from JS so that with scripting
+       off, or without IntersectionObserver, nothing is ever hidden. */
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce && 'IntersectionObserver' in window) {
+      requestAnimationFrame(() => {
+        const io = new IntersectionObserver((entries) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            e.target.classList.add('in');
+            io.unobserve(e.target);
+          }
+        }, { rootMargin: '0px 0px -60px 0px' });
+        document.querySelectorAll('.section').forEach((el, i) => {
+          if (i === 0) return;                 // the first screen should never wait
+          el.classList.add('reveal');
+          io.observe(el);
+        });
+      });
+    }
+
     const footer = document.createElement('footer');
     footer.className = 'site';
     footer.innerHTML = `
@@ -648,7 +683,24 @@
     return { get: () => input.checked, set: (v) => { input.checked = v; onChange && onChange(v); } };
   }
 
-  /** A grid of read-only stat tiles; returns a setter keyed by name. */
+  /* plot.js owns the high-DPI helper; fall back if it has not loaded. */
+  function fitCanvas(canvas, w, h) {
+    if (root.ML && root.ML.hidpi) return root.ML.hidpi(canvas, w, h);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(w * dpr));
+    canvas.height = Math.max(1, Math.round(h * dpr));
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return ctx;
+  }
+
+  /**
+   * A grid of read-only stat tiles; returns a setter keyed by name.
+   *
+   * Numeric stats also grow a sparkline of their own recent history, drawn
+   * behind the number — a stat that is climbing looks different from one that
+   * has stalled, without anyone having to watch it continuously.
+   */
   function statGrid(parent, names) {
     const grid = document.createElement('div');
     grid.className = 'stat-grid';
@@ -656,15 +708,54 @@
     for (const n of names) {
       const d = document.createElement('div');
       d.className = 'stat';
-      d.innerHTML = `<div class="k">${n}</div><div class="v">–</div>`;
+      d.innerHTML = `<canvas class="spark"></canvas><div class="k">${n}</div><div class="v">–</div>`;
       grid.appendChild(d);
-      map[n] = d.querySelector('.v');
+      map[n] = { value: d.querySelector('.v'), canvas: d.querySelector('.spark'), history: [], ctx: null };
     }
     parent.appendChild(grid);
+
+    const numeric = (v) => {
+      if (typeof v === 'number') return isFinite(v) ? v : null;
+      const m = String(v).replace(/,/g, '').match(/^-?\d+(\.\d+)?/);
+      return m ? parseFloat(m[0]) : null;
+    };
+
+    function drawSpark(entry) {
+      const { canvas, history } = entry;
+      if (history.length < 3) return;
+      const w = canvas.clientWidth || 0, h = canvas.clientHeight || 0;
+      if (!w || !h) return;
+      if (!entry.ctx || entry.w !== w) { entry.ctx = fitCanvas(canvas, w, h); entry.w = w; }
+      const ctx = entry.ctx;
+      ctx.clearRect(0, 0, w, h);
+      let lo = Infinity, hi = -Infinity;
+      for (const v of history) { if (v < lo) lo = v; if (v > hi) hi = v; }
+      if (hi - lo < 1e-9) { hi = lo + 1; lo -= 0.5; }
+      ctx.beginPath();
+      history.forEach((v, i) => {
+        const x = (i / (history.length - 1)) * w;
+        const y = h - 2 - ((v - lo) / (hi - lo)) * (h - 6);
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      ctx.strokeStyle = 'rgba(124, 148, 190, .38)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+      ctx.fillStyle = 'rgba(77, 163, 255, .07)';
+      ctx.fill();
+    }
+
     return (name, value, cls = '') => {
-      if (!map[name]) return;
-      map[name].textContent = value;
-      map[name].className = 'v ' + cls;
+      const entry = map[name];
+      if (!entry) return;
+      entry.value.textContent = value;
+      entry.value.className = 'v ' + cls;
+      const n = numeric(value);
+      if (n !== null) {
+        entry.history.push(n);
+        if (entry.history.length > 48) entry.history.shift();
+        drawSpark(entry);
+      }
     };
   }
 

@@ -50,7 +50,7 @@ and badges only unlock for models you trained yourself.
 
 ## Goals, challenges and quizzes
 
-Twenty-six badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
+Twenty-nine badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
 on the home page. None are for clicking around — each falls into one of three kinds:
 
 - **Things your model does.** Evolve a car that finishes the course, train a bot that beats the
@@ -60,6 +60,9 @@ on the home page. None are for clicking around — each falls into one of three 
   your kernel's output against a Sobel-Y reference, so any scaling or sign flip of a real edge
   detector passes and clicking the preset does not. "Solve the spiral with 8 hidden neurons or
   fewer" is checked the same way, against held-out accuracy.
+- **Predict, then check.** Before the CNN reveals its confusion matrix, you commit to which digits
+  it will mix up; before the transformer trains, you commit to where its attention will land. Both
+  are scored against your own model's real behaviour, not a stored answer.
 - **A capstone.** Nine situations where one method fits and three are things people genuinely reach
   for and regret, then four training runs shown only as curves — each the signature of a failure you
   produced yourself earlier in the course. It is the only part of the site that tests whether the
@@ -122,6 +125,8 @@ files are a short read that shows what it does.
 ```bash
 node tests/gradcheck.cjs     # no dependencies
 ```
+
+Both suites also run in CI on every push (`.github/workflows/tests.yml`).
 
 Checks every hand-written backward pass — dense layers, convolution, max pooling, softmax attention
 and layer norm — against numerical gradients, then sanity-checks the arena physics and confirms that

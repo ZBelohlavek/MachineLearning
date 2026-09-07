@@ -26,10 +26,10 @@
         <span class="eyebrow">interactive · no installs · nothing pre-trained</span>
         <h1>Learn machine learning by building it</h1>
         <p class="lead">
-          Seven lessons and a capstone, each one a working model you train yourself in the browser. Design the
-          reward function for a Rocket League bot and watch it teach itself to score. Evolve a
-          population of cars around a track you drew, then race the winner. Draw a digit and see
-          every feature map in a network you trained thirty seconds earlier.
+          Eight lessons and a capstone, each one a working model you train yourself in the browser.
+          Design the reward function for a Rocket League bot and watch it teach itself to score.
+          Evolve a population of cars around a track you drew, then race the winner. Train a tiny
+          language model on your own writing and watch noise turn into sentences.
         </p>
         <div class="controls" style="margin-top:22px">
           <a class="btn primary" href="lessons/foundations.html" style="text-decoration:none">Start at the beginning</a>
@@ -44,8 +44,8 @@
     <div class="panel">
       <b>Everything runs here</b>
       <p class="mb0" style="font-size:.9rem">No servers, no API keys, no downloads. Backpropagation,
-      Adam, PPO, convolutions and attention are all plain JavaScript in this repository, and your
-      machine does the training.</p>
+      Adam, PPO, convolutions, attention and a causal transformer are all plain JavaScript in this
+      repository, and your machine does the training.</p>
     </div>
     <div class="panel">
       <b>Skip the waiting, or don't</b>
@@ -55,9 +55,10 @@
     </div>
     <div class="panel">
       <b>Goals, challenges and quizzes</b>
-      <p class="mb0" style="font-size:.9rem">Twenty-six badges, none for clicking around: they
+      <p class="mb0" style="font-size:.9rem">Twenty-nine badges, none for clicking around: they
       unlock when a model of yours does something — evolves a car that finishes, trains a bot that
-      scores, or answers three questions about what you just watched happen.</p>
+      scores, teaches itself to write words, or answers three questions about what you just watched
+      happen.</p>
     </div>
     <div class="panel">
       <b>You are meant to break it</b>
@@ -92,6 +93,9 @@
       <li><strong>"I want to understand vision models."</strong> Convolutions → Train a CNN → Vision
         Transformers, in that order. The first is arithmetic you do by hand; the last is a real
         transformer with its attention maps exposed.</li>
+      <li><strong>"I want to understand language models."</strong> Vision Transformers first for the
+        attention mechanism, then <a href="lessons/language.html">Teach a model to write</a>, which is
+        the same block with causal masking and characters instead of patches.</li>
       <li><strong>"I've never trained anything."</strong> Start with
         <a href="lessons/foundations.html">Foundations</a>. Everything else is that same loop with
         more interesting shapes attached.</li>

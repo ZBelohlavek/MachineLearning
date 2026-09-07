@@ -388,6 +388,8 @@
       ctx.fillStyle = '#4da3ff';
       ctx.beginPath(); ctx.arc(ax, ay, cell * 0.22, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
+
+      drawHoverCard();
     }
 
     /* ------------------------------- the update read-out ---------------- */
@@ -428,6 +430,52 @@
       { value: 'open', label: 'Open field' },
       { value: 'random', label: 'Random' },
     ], 'maze', (v) => { grid.loadPreset(v); hardReset(); });
+
+    /* Hovering a square shows what the agent actually believes about it: the
+       four numbers behind the triangles, which are otherwise only a colour. */
+    let hoverCell = null;
+    canvas.addEventListener('pointermove', (ev) => {
+      const r = canvas.getBoundingClientRect();
+      const x = Math.floor(((ev.clientX - r.left) / r.width) * GW);
+      const y = Math.floor(((ev.clientY - r.top) / r.height) * GH);
+      const next = grid.inside(x, y) ? { x, y } : null;
+      if (!next !== !hoverCell || (next && hoverCell && (next.x !== hoverCell.x || next.y !== hoverCell.y))) {
+        hoverCell = next;
+        draw();
+      }
+    });
+    canvas.addEventListener('pointerleave', () => { hoverCell = null; draw(); });
+
+    function drawHoverCard() {
+      if (!hoverCell) return;
+      const { x, y } = hoverCell;
+      const t = grid.get(x, y);
+      const q = agent.qs({ x, y });
+      const lines = t === WALL ? ['wall — the agent cannot enter']
+        : t === GOAL ? ['goal — reward +1, episode ends']
+        : t === PIT ? ['pit — reward −1, episode ends']
+        : [
+            `↑ ${q[0].toFixed(3)}    → ${q[1].toFixed(3)}`,
+            `↓ ${q[2].toFixed(3)}    ← ${q[3].toFixed(3)}`,
+            `best: ${ANAMES[agent.bestA({ x, y })]}   visits: ${agent.visits[y * GW + x]}`,
+          ];
+      ctx.font = '11px ui-monospace, monospace';
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 18;
+      const h = lines.length * 15 + 14;
+      let bx = x * cell + cell + 8, by = y * cell;
+      if (bx + w > ctx._cssW) bx = x * cell - w - 8;
+      if (by + h > ctx._cssH) by = ctx._cssH - h - 2;
+      ctx.fillStyle = 'rgba(10,15,25,.95)';
+      ctx.strokeStyle = '#3a4a6d';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.rect(bx, Math.max(2, by), w, h); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#cfe0ff';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      lines.forEach((l, i) => ctx.fillText(l, bx + 9, Math.max(2, by) + 8 + i * 15));
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x * cell + 1.5, y * cell + 1.5, cell - 3, cell - 3);
+    }
 
     let painting = false;
     const paint = (ev) => {
