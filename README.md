@@ -49,7 +49,7 @@ and badges only unlock for models you trained yourself.
 
 ## Goals, challenges and quizzes
 
-Twenty-four badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
+Twenty-six badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
 on the home page. None are for clicking around — each falls into one of three kinds:
 
 - **Things your model does.** Evolve a car that finishes the course, train a bot that beats the
