@@ -13,7 +13,7 @@
 
 ;(function () {
   'use strict';
-  const { MLP, mulberry32, randn, clamp, hidpi, LineChart, achieve,
+  const { MLP, mulberry32, randn, clamp, hidpi, LineChart, achieve, dpad,
           chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop } = window.ML;
 
   const GW = 240, GH = 150;          // track grid, in cells
@@ -589,6 +589,7 @@
       if (v === 'race') { running = false; btnRun.textContent = '▶ Evolve'; btnRun.classList.add('primary'); startRace(); }
     });
     document.getElementById('btn-race-again').addEventListener('click', startRace);
+    dpad(document.getElementById('race-pad'), { keys });
 
     const cfg = document.getElementById('racer-config');
     slider(cfg, {

@@ -496,6 +496,53 @@
     };
   }
 
+  /**
+   * On-screen direction pad, for the games. Without it none of the driving is
+   * playable on a phone, since every one of them expects arrow keys.
+   *
+   * dpad(container, { onPress(dir, down), keys, discrete, always })
+   *   keys      an object to mirror the arrow state into ({up,down,left,right})
+   *   discrete  fire onPress once per tap rather than tracking hold state
+   *   always    show on desktop too (default: only on touch devices)
+   */
+  function dpad(container, opts = {}) {
+    if (!container) return null;
+    const touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    if (!touch && !opts.always) return null;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'dpad';
+    const mk = (dir, label, cls) => {
+      const b = document.createElement('button');
+      b.className = 'dpad-btn ' + cls;
+      b.type = 'button';
+      b.textContent = label;
+      b.setAttribute('aria-label', dir);
+      const set = (down) => (ev) => {
+        ev.preventDefault();
+        if (opts.keys) opts.keys[dir] = down;
+        if (opts.onPress && (down || !opts.discrete)) opts.onPress(dir, down);
+        b.classList.toggle('is-pressed', down);
+      };
+      if (opts.discrete) {
+        b.addEventListener('pointerdown', set(true));
+        b.addEventListener('pointerup', (e) => { e.preventDefault(); b.classList.remove('is-pressed'); });
+      } else {
+        b.addEventListener('pointerdown', set(true));
+        b.addEventListener('pointerup', set(false));
+        b.addEventListener('pointerleave', set(false));
+        b.addEventListener('pointercancel', set(false));
+      }
+      return b;
+    };
+    wrap.appendChild(mk('up', '▲', 'up'));
+    wrap.appendChild(mk('left', '◀', 'left'));
+    wrap.appendChild(mk('down', '▼', 'down'));
+    wrap.appendChild(mk('right', '▶', 'right'));
+    container.appendChild(wrap);
+    return wrap;
+  }
+
   /** Canvas pointer position in canvas CSS pixels. */
   function pointerPos(canvas, ev) {
     const r = canvas.getBoundingClientRect();
@@ -507,5 +554,5 @@
   }
 
   return { LESSONS, BADGES, chrome, nextLinks, achieve, badgesEarned, onBadge,
-           quiz, goalPanel, slider, pills, checkbox, statGrid, rafLoop, pointerPos };
+           quiz, goalPanel, dpad, slider, pills, checkbox, statGrid, rafLoop, pointerPos };
 });

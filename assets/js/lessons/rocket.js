@@ -10,7 +10,7 @@
     F, ACTIONS, ACTION_LABELS, OBS_SIZE, DEFAULT_REWARDS, REWARD_PRESETS,
     Arena, scriptedAction, Trainer, DEFAULT_HP,
     hidpi, fit, LineChart, diverging, heat, softmax, argmax, sampleFrom, clamp, MLP,
-    chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop, achieve,
+    chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop, achieve, dpad,
   } = window.ML;
 
   const COL = {
@@ -387,6 +387,8 @@
       totalEl.textContent = epReward.toFixed(1);
       if (arena.done) epReward = 0;
     };
+
+    dpad(document.getElementById('sandbox-pad'), { keys: sandbox.keys });
 
     const sandboxCtl = document.getElementById('sandbox-controls');
     const sandboxMode = pills(sandboxCtl, [
@@ -796,6 +798,8 @@
     /* ==================================================================
        PANEL 5 — play against your agent
        ================================================================== */
+    dpad(document.getElementById('match-pad'), { keys: match.keys });
+
     pills(document.getElementById('play-mode'), [
       { value: 'selfplay', label: 'Agent vs agent' },
       { value: 'vs-scripted', label: 'Agent vs scripted bot' },

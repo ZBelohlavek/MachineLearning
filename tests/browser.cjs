@@ -311,6 +311,29 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- on-screen controls, on a touch device ---- */
+  {
+    const touchCtx = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
+    const page = await touchCtx.newPage();
+    page.on('pageerror', (e) => errs.push('touch: ' + e.message));
+    await page.goto(B + 'lessons/gridworld.html');
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto';
+      const el = document.querySelector('#grid-canvas'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 60); });
+    await page.click('#btn-race');
+    await page.waitForTimeout(300);
+    const buttons = await page.evaluate(() => document.querySelectorAll('#race-pad .dpad-btn').length);
+    for (let i = 0; i < 3; i++) { await page.tap('#race-pad .dpad-btn.right'); await page.waitForTimeout(120); }
+    const readout = await page.textContent('#race-readout');
+    check('touch · the maze is playable with the on-screen pad',
+          buttons === 4 && /your steps\s*3/.test(readout.replace(/<[^>]*>/g, '')),
+          `(${buttons} buttons)`);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2);
+    check('touch · the page still fits a 390px screen', overflow);
+    await page.close();
+    await touchCtx.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();

@@ -8,7 +8,7 @@
 
 ;(function () {
   'use strict';
-  const { hidpi, fit, LineChart, chrome, nextLinks, slider, pills, checkbox, achieve,
+  const { hidpi, fit, LineChart, chrome, nextLinks, slider, pills, checkbox, achieve, dpad,
           statGrid, rafLoop, mulberry32, clamp } = window.ML;
 
   const EMPTY = 0, WALL = 1, GOAL = 2, PIT = 3, START = 4;
@@ -227,7 +227,7 @@
       btnRun.classList.add('primary');
       player = { ...grid.startPos };
       playerSteps = 0;
-      raceMsg = 'Use the arrow keys.';
+      raceMsg = ('ontouchstart' in window) ? 'Tap the arrows below to move.' : 'Use the arrow keys.';
       updateRaceUI();
       draw();
     }
@@ -272,6 +272,11 @@
       movePlayer(dir);
     });
     document.getElementById('btn-race').addEventListener('click', startRace);
+    // one square per tap, matching how the keyboard controls behave here
+    dpad(document.getElementById('race-pad'), {
+      discrete: true,
+      onPress: (dir) => movePlayer({ up: 0, right: 1, down: 2, left: 3 }[dir]),
+    });
 
     /* ------------------------------- drawing ---------------------------- */
     function qColor(v, scale) {

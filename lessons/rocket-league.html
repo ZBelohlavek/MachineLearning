@@ -101,9 +101,10 @@
       <div class="panel">
         <div class="panel-title">
           <h3>The arena</h3>
-          <span class="hint">click the arena first, then use the arrow keys</span>
+          <span class="hint">arrow keys, or the pad below on a phone</span>
         </div>
         <canvas id="sandbox-canvas" class="stage" role="img" aria-label="Top-down Rocket League arena. Drive the blue car with the arrow keys."></canvas>
+        <div id="sandbox-pad"></div>
         <div id="sandbox-controls" style="margin-top:12px"></div>
       </div>
 
@@ -411,6 +412,7 @@
     <div class="panel">
       <div class="panel-title"><h3>Match settings</h3><span class="hint">applies to the arena in Step 5</span></div>
       <div id="play-mode"></div>
+      <div id="match-pad"></div>
       <p class="muted" style="font-size:.82rem;margin-top:12px">
         Greedy mode removes the randomness and always plays the top-scoring action — that's how you'd
         ship an agent. Leave it off during training: the exploration is what's producing the learning.

@@ -156,3 +156,8 @@ workflow, no configuration file.
 Any modern browser. The heavy lessons are CPU-bound single-threaded JavaScript, so a desktop machine
 gives noticeably faster training than a phone. Everything is drawn with the 2D canvas API — no WebGL
 and no WebAssembly.
+
+On touch devices the three driving games (Rocket League, the racer and the Q-learning maze) show an
+on-screen direction pad, since they would otherwise be unplayable without a keyboard, and the
+navigation collapses into a single swipeable row. Canvases you draw on capture touch gestures;
+everything else lets a finger scroll past.
