@@ -72,33 +72,52 @@
   }
 
   /**
-   * Single-head self-attention.
-   *   scores = Q·Kᵀ / sqrt(d)   ->   A = softmax(scores)   ->   out = Wo(A·V)
+   * Multi-head self-attention.
+   *
+   *   scores = Q·Kᵀ / sqrt(d_head)   ->   A = softmax(scores)   ->   out = Wo(A·V)
+   *
    * Every token compares itself against every other token and takes a weighted
-   * average of their values. The weights are the attention map.
+   * average of their values. With more than one head, the d features are split
+   * into H independent slices that each run their own comparison — so different
+   * heads can attend to different relationships and the model is not forced to
+   * average them into one map.
    */
   class SelfAttention {
-    constructor(T, d, rand = Math.random) {
-      this.T = T; this.d = d;
-      this.scale = 1 / Math.sqrt(d);
+    constructor(T, d, rand = Math.random, heads = 1) {
+      const H = Math.max(1, Math.min(heads, d));
+      this.T = T; this.d = d; this.H = H; this.dh = Math.floor(d / H);
+      this.scale = 1 / Math.sqrt(this.dh);
       this.q = new TokenLinear(T, d, d, rand, 0.5 / Math.sqrt(d));
       this.k = new TokenLinear(T, d, d, rand, 0.5 / Math.sqrt(d));
       this.v = new TokenLinear(T, d, d, rand, 0.5 / Math.sqrt(d));
       this.o = new TokenLinear(T, d, d, rand, 0.5 / Math.sqrt(d));
-      this.S = new Float32Array(T * T);
-      this.A = new Float32Array(T * T);      // the attention map, kept for drawing
+      // attention maps, one T×T block per head
+      this.A = new Float32Array(H * T * T);
+      this.dA = new Float32Array(H * T * T);
+      this.dS = new Float32Array(H * T * T);
       this.C = new Float32Array(T * d);
-      this.dC = new Float32Array(T * d);
-      this.dA = new Float32Array(T * T);
-      this.dS = new Float32Array(T * T);
       this.dQ = new Float32Array(T * d);
       this.dK = new Float32Array(T * d);
       this.dV = new Float32Array(T * d);
       this.dX = new Float32Array(T * d);
     }
 
+    /** The T×T attention map for one head. */
+    head(h) { return this.A.subarray(h * this.T * this.T, (h + 1) * this.T * this.T); }
+
+    /** Attention averaged over heads — what the "all heads" view shows. */
+    mean() {
+      const { T, H } = this;
+      const out = new Float32Array(T * T);
+      for (let h = 0; h < H; h++) {
+        const a = this.head(h);
+        for (let i = 0; i < T * T; i++) out[i] += a[i] / H;
+      }
+      return out;
+    }
+
     forward(x) {
-      const { T, d, scale, S, A, C } = this;
+      const { T, d, H, dh, scale, A, C } = this;
       // Three different linear views of the same tokens: what each token is
       // looking for (Q), what it offers as a label (K), and what it passes on (V).
       const Qv = this.q.forward(x);
@@ -106,60 +125,65 @@
       const V = this.v.forward(x);
       this.Qv = Qv; this.Kv = K; this.Vv = V;
 
-      for (let t = 0; t < T; t++) {
-        let max = -Infinity;
-        for (let u = 0; u < T; u++) {
-          let s = 0;
-          for (let i = 0; i < d; i++) s += Qv[t * d + i] * K[u * d + i];
-          s *= scale;
-          S[t * T + u] = s;
-          if (s > max) max = s;
-        }
-        let sum = 0;
-        for (let u = 0; u < T; u++) { const e = Math.exp(S[t * T + u] - max); A[t * T + u] = e; sum += e; }
-        for (let u = 0; u < T; u++) A[t * T + u] /= sum;
-        for (let i = 0; i < d; i++) {
-          let acc = 0;
-          for (let u = 0; u < T; u++) acc += A[t * T + u] * V[u * d + i];
-          C[t * d + i] = acc;
+      for (let h = 0; h < H; h++) {
+        const off = h * dh, base = h * T * T;
+        for (let t = 0; t < T; t++) {
+          let max = -Infinity;
+          for (let u = 0; u < T; u++) {
+            let sc = 0;
+            for (let i = 0; i < dh; i++) sc += Qv[t * d + off + i] * K[u * d + off + i];
+            sc *= scale;
+            A[base + t * T + u] = sc;
+            if (sc > max) max = sc;
+          }
+          let sum = 0;
+          for (let u = 0; u < T; u++) {
+            const e = Math.exp(A[base + t * T + u] - max);
+            A[base + t * T + u] = e;
+            sum += e;
+          }
+          for (let u = 0; u < T; u++) A[base + t * T + u] /= sum;
+          for (let i = 0; i < dh; i++) {
+            let acc = 0;
+            for (let u = 0; u < T; u++) acc += A[base + t * T + u] * V[u * d + off + i];
+            C[t * d + off + i] = acc;
+          }
         }
       }
       return this.o.forward(C);
     }
 
     backward(dOut) {
-      const { T, d, scale, A, dA, dS, dQ, dK, dV, dX } = this;
+      const { T, d, H, dh, scale, A, dA, dS, dQ, dK, dV, dX } = this;
       const Qv = this.Qv, Kv = this.Kv, Vv = this.Vv;
       const dC = this.o.backward(dOut);
 
-      dA.fill(0); dV.fill(0);
-      for (let t = 0; t < T; t++) {
-        for (let u = 0; u < T; u++) {
-          let s = 0;
-          for (let i = 0; i < d; i++) s += dC[t * d + i] * Vv[u * d + i];
-          dA[t * T + u] = s;                                  // dL/dA
-        }
-        for (let u = 0; u < T; u++) {
-          const a = A[t * T + u];
-          for (let i = 0; i < d; i++) dV[u * d + i] += a * dC[t * d + i];
-        }
-      }
-
-      // softmax jacobian, row by row: dS = A * (dA - sum(A*dA))
-      for (let t = 0; t < T; t++) {
-        let dot = 0;
-        for (let u = 0; u < T; u++) dot += A[t * T + u] * dA[t * T + u];
-        for (let u = 0; u < T; u++) dS[t * T + u] = A[t * T + u] * (dA[t * T + u] - dot);
-      }
-
-      dQ.fill(0); dK.fill(0);
-      for (let t = 0; t < T; t++) {
-        for (let u = 0; u < T; u++) {
-          const g = dS[t * T + u] * scale;
-          if (g === 0) continue;
-          for (let i = 0; i < d; i++) {
-            dQ[t * d + i] += g * Kv[u * d + i];
-            dK[u * d + i] += g * Qv[t * d + i];
+      dA.fill(0); dV.fill(0); dQ.fill(0); dK.fill(0);
+      for (let h = 0; h < H; h++) {
+        const off = h * dh, base = h * T * T;
+        for (let t = 0; t < T; t++) {
+          for (let u = 0; u < T; u++) {
+            let sc = 0;
+            for (let i = 0; i < dh; i++) sc += dC[t * d + off + i] * Vv[u * d + off + i];
+            dA[base + t * T + u] = sc;                       // dL/dA
+          }
+          for (let u = 0; u < T; u++) {
+            const a = A[base + t * T + u];
+            for (let i = 0; i < dh; i++) dV[u * d + off + i] += a * dC[t * d + off + i];
+          }
+          // softmax jacobian, row by row: dS = A * (dA - sum(A*dA))
+          let dot = 0;
+          for (let u = 0; u < T; u++) dot += A[base + t * T + u] * dA[base + t * T + u];
+          for (let u = 0; u < T; u++) {
+            dS[base + t * T + u] = A[base + t * T + u] * (dA[base + t * T + u] - dot);
+          }
+          for (let u = 0; u < T; u++) {
+            const g = dS[base + t * T + u] * scale;
+            if (g === 0) continue;
+            for (let i = 0; i < dh; i++) {
+              dQ[t * d + off + i] += g * Kv[u * d + off + i];
+              dK[u * d + off + i] += g * Qv[t * d + off + i];
+            }
           }
         }
       }
@@ -277,7 +301,8 @@
       const d = opts.dim ?? 24;
       const rand = opts.rand || Math.random;
 
-      Object.assign(this, { imgSize, patch, grid, Tp, T, d, useCLS, useNorm, classes: opts.classes ?? 10 });
+      Object.assign(this, { imgSize, patch, grid, Tp, T, d, useCLS, useNorm,
+                            classes: opts.classes ?? 10 });
       this.patchDim = patch * patch;
 
       this.embed = new TokenLinear(Tp, this.patchDim, d, rand);
@@ -288,8 +313,9 @@
       for (let i = 0; i < d; i++) this.cls.v[i] = randn(rand) * 0.02;
       this.pos = new Param(T * d);                       // learned position embeddings
       for (let i = 0; i < this.pos.v.length; i++) this.pos.v[i] = randn(rand) * 0.02;
+      this.heads = opts.heads ?? 1;
       this.ln1 = new LayerNorm(T, d);
-      this.attn = new SelfAttention(T, d, rand);
+      this.attn = new SelfAttention(T, d, rand, this.heads);
       this.ln2 = new LayerNorm(T, d);
       this.mlp = new TokenMLP(T, d, opts.mlpHidden ?? 48, rand);
       this.ln3 = new LayerNorm(T, d);
@@ -405,28 +431,40 @@
     }
 
     /** What the class token attends to, per patch (drops its self-attention). */
-    clsAttention() {
+    /** The attention map to read: one head, or the average across all of them. */
+    map(head) {
+      return (head == null || head < 0 || this.attn.H === 1) ? this.attn.mean() : this.attn.head(head);
+    }
+
+    clsAttention(head) {
+      const A = this.map(head);
       const out = new Float32Array(this.Tp);
-      if (!this.useCLS) return this.attentionMass().subarray(0, this.Tp);
-      for (let u = 0; u < this.Tp; u++) out[u] = this.attn.A[u + 1];
+      if (!this.useCLS) {
+        for (let t = 0; t < this.T; t++)
+          for (let u = 0; u < this.Tp; u++) out[u] += A[t * this.T + u] / this.T;
+        return out;
+      }
+      for (let u = 0; u < this.Tp; u++) out[u] = A[u + 1];
       return out;
     }
 
     /** Attention weights from one token to all tokens (after a forward pass). */
-    attentionFrom(token) {
-      return this.attn.A.subarray(token * this.T, (token + 1) * this.T);
+    attentionFrom(token, head) {
+      return this.map(head).subarray(token * this.T, (token + 1) * this.T);
     }
     /** How much attention every patch pays to one particular patch. */
-    attentionTo(token) {
+    attentionTo(token, head) {
+      const A = this.map(head);
       const out = new Float32Array(this.T);
-      for (let t = 0; t < this.T; t++) out[t] = this.attn.A[t * this.T + token];
+      for (let t = 0; t < this.T; t++) out[t] = A[t * this.T + token];
       return out;
     }
-    /** Average incoming attention per patch — "what did the image look at?" */
-    attentionMass() {
+    /** Average incoming attention per token — "what did the image look at?" */
+    attentionMass(head) {
+      const A = this.map(head);
       const out = new Float32Array(this.T);
       for (let t = 0; t < this.T; t++)
-        for (let u = 0; u < this.T; u++) out[u] += this.attn.A[t * this.T + u] / this.T;
+        for (let u = 0; u < this.T; u++) out[u] += A[t * this.T + u] / this.T;
       return out;
     }
     toJSON() { return { params: this.params().map((p) => Array.from(p.v)) }; }

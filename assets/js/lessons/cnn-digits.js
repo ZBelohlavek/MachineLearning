@@ -449,6 +449,49 @@
       }
     }
 
+    /* ------------------------- predict, then check -------------------------
+       Scored against this run's own confusion matrix rather than a stored
+       answer, so it is a real prediction about a real model.
+       ---------------------------------------------------------------------- */
+    const PAIR_OPTS = [
+      { label: '4 and 9', value: '4-9' },
+      { label: '3 and 8', value: '3-8' },
+      { label: '1 and 7', value: '1-7' },
+      { label: '5 and 6', value: '5-6' },
+      { label: 'something else', value: 'other' },
+    ];
+    const confusionPredict = window.ML.predictBox(document.getElementById('confusion-predict'), {
+      id: 'cnn-confusion-pair',
+      question: 'Which two digits will this network mix up most often? Commit before you train it.',
+      hint: 'Scored against your own confusion matrix.',
+      options: PAIR_OPTS,
+    });
+
+    /** The pair with the most errors in both directions. */
+    function worstPair(conf) {
+      let best = null, bestN = 0, total = 0;
+      for (let t = 0; t < 10; t++) {
+        for (let p = t + 1; p < 10; p++) {
+          const n = conf[t * 10 + p] + conf[p * 10 + t];
+          total += n;
+          if (n > bestN) { bestN = n; best = [t, p]; }
+        }
+      }
+      return { pair: best, count: bestN, total };
+    }
+
+    function scoreConfusionPrediction(conf) {
+      if (!confusionPredict || confusionPredict.choice === null) return;
+      const { pair, count, total } = worstPair(conf);
+      if (!pair || total < 6) return;                 // too few mistakes to call it yet
+      const key = `${pair[0]}-${pair[1]}`;
+      const known = PAIR_OPTS.some((o) => o.value === key);
+      confusionPredict.reveal(known ? key : 'other',
+        `Your network's most confused pair is <b>${pair[0]} and ${pair[1]}</b> — ${count} of its ` +
+        `${total} mistakes. Which pairs collide depends on the fonts this run happened to draw, so ` +
+        `train it again with a different seed and the answer can genuinely change.`);
+    }
+
     /* ------------------------- confusion matrix ------------------------- */
     function drawConfusion(conf) {
       const host = document.getElementById('confusion');
@@ -593,6 +636,7 @@
           chart.push(seen, [trainAcc, ev.acc]);
           drawConfusion(ev.conf);
           drawMistakes(ev.wrong);
+          scoreConfusionPrediction(ev.conf);
         } else {
           chart.push(seen, [trainAcc, null]);
         }

@@ -27,6 +27,8 @@
     color: #9fd0ff; font-size: .8rem; font-weight: 700; font-family: var(--mono);
   }
   .loop-svg { width: 100%; max-width: 560px; height: auto; display: block; margin: 18px auto; }
+  #stage-arena.twin { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { #stage-arena.twin { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -191,10 +193,11 @@
     <h2>Step 3 · Watch three thousand episodes in thirty seconds</h2>
     <p>
       Training an agent from scratch takes a few minutes of real time, and the first minute of it is
-      a car spinning in circles. So here is one prepared earlier: checkpoints saved at intervals
-      through a full training run, which you can scrub through like a video. Every one is the real
+      a car spinning in circles. So here are two prepared earlier: checkpoints saved at intervals
+      through two full training runs, which you can scrub through like a video. Every one is the real
       policy from that moment — the same network, playing live, with the weights it had after that
-      many episodes.
+      many episodes. One run was trained on a sensible reward. The other was trained on a broken one,
+      and is worth at least as much of your attention.
     </p>
 
     <div class="split">
@@ -204,9 +207,18 @@
           <span class="hint">drag the slider to move through the run</span>
         </div>
         <div id="timelapse-body">
-          <canvas id="stage-canvas" class="stage" role="img" aria-label="Training timelapse: the agent playing with the weights it had at the selected checkpoint."></canvas>
-          <div id="stage-label" style="margin-top:12px;font-size:.95rem"></div>
-          <div id="stage-detail" style="margin-top:8px"></div>
+          <div id="stage-arena">
+            <div>
+              <canvas id="stage-canvas" class="stage" role="img" aria-label="Training timelapse: the agent playing with the weights it had at the selected checkpoint."></canvas>
+              <div id="stage-label" style="margin-top:12px;font-size:.95rem"></div>
+              <div id="stage-detail" style="margin-top:8px"></div>
+            </div>
+            <div hidden>
+              <canvas id="stage-canvas-b" class="stage" role="img" aria-label="The same training run under a broken reward function."></canvas>
+              <div id="stage-label-b" style="margin-top:12px;font-size:.95rem"></div>
+            </div>
+          </div>
+          <div id="stage-compare" style="margin-top:14px"></div>
           <input type="range" id="stage-scrub" min="0" max="1" step="1" value="0" style="margin-top:14px">
           <div class="controls" style="margin-top:12px">
             <button id="stage-play" class="primary">▶ Play the whole run</button>
@@ -239,6 +251,21 @@
           period where the agent drives at the ball and pushes it <em>anywhere</em>, including into
           its own net — the shaping reward for touching the ball is being collected, and the goal
           reward hasn't outweighed it yet. That's an agent optimising exactly what you asked for.</p>
+        </div>
+
+        <div class="note warn" style="margin-top:14px">
+          <b class="label">The second run is the same algorithm with a broken reward</b>
+          <p>Switch the panel to <b>Side by side</b>. Both agents had twelve thousand episodes, the
+          same network, the same physics and the same PPO code. The only difference is the reward:
+          the one on the right was paid generously for <em>touching</em> and <em>approaching</em> the
+          ball, and almost nothing for scoring.</p>
+          <p class="mb0">It ends the run scoring in <b>0 of 30</b> empty-net attempts, against 19 of
+          20 for the well-shaped agent. And the way it fails is the interesting part — measured over
+          30 episodes it sits <b>3.4× closer</b> to the ball (mean distance 17 units against 58) while
+          touching it <b>13× less often</b> (0.2 touches an episode against 2.6). It learned to shadow
+          the ball without ever hitting it, because hitting the ball pushes it away, and being close
+          to the ball was what you paid for. Nobody wrote "hover near the ball" anywhere. It is the
+          exact maximum of the function that was actually specified.</p>
         </div>
       </div>
     </div>
@@ -461,6 +488,7 @@
 <script src="../assets/js/lib/ui.js"></script>
 <script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/models/rocket-stages.js"></script>
+<script src="../assets/models/rocket-stages-chaser.js"></script>
 <script src="../assets/js/lessons/rocket-env.js"></script>
 <script src="../assets/js/lessons/rocket-train.js"></script>
 <script src="../assets/js/lessons/rocket.js"></script>

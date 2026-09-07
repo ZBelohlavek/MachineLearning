@@ -458,7 +458,11 @@
        trained offline by tools/train-rocket.cjs: drag through them and watch
        three thousand episodes of learning in a few seconds.
        ================================================================== */
-    const stagesData = window.ML_ROCKET_STAGES;
+    const STAGE_SETS = {
+      good: { data: window.ML_ROCKET_STAGES, label: 'Well-shaped rewards' },
+      chaser: { data: window.ML_ROCKET_STAGES_CHASER, label: 'Ball-chaser rewards' },
+    };
+    const stagesData = STAGE_SETS.good.data;
     const tlBody = document.getElementById('timelapse-body');
 
     if (!stagesData) {
@@ -468,14 +472,28 @@
         'an agent yourself in the next section.</p>';
     } else {
       const stages = stagesData.stages;
-      const stageAgent = {
-        policy: null, value: null,
-        hp: { actionRepeat: (stagesData.hp && stagesData.hp.actionRepeat) || 2 },
-      };
+      const repeat = (stagesData.hp && stagesData.hp.actionRepeat) || 2;
+      const stageAgent = { policy: null, value: null, hp: { actionRepeat: repeat } };
       const stageMatch = new Match(document.getElementById('stage-canvas'), {
         trainer: stageAgent, mode: 'selfplay', rewards,
       });
       stageMatch.greedy = false;
+
+      /* The second arena holds an agent trained for twelve thousand episodes on
+         a reward that pays for touching and approaching the ball but barely for
+         scoring. It is the same algorithm, the same amount of training and the
+         same physics — only the reward differs. */
+      const hacked = STAGE_SETS.chaser.data;
+      const hackedAgent = { policy: null, value: null, hp: { actionRepeat: repeat } };
+      const hackedMatch = hacked ? new Match(document.getElementById('stage-canvas-b'), {
+        trainer: hackedAgent, mode: 'selfplay', rewards: REWARD_PRESETS.chaser,
+      }) : null;
+      if (hackedMatch) hackedMatch.greedy = false;
+
+      let compare = 'good';       // 'good' | 'chaser' | 'both'
+      const compareWrap = document.getElementById('stage-compare');
+      const canvasB = document.getElementById('stage-canvas-b');
+      const labelB = document.getElementById('stage-label-b');
 
       // Two charts rather than one: a rate between 0 and 1 and a count that
       // reaches double figures do not share an axis usefully.
@@ -498,6 +516,13 @@
       scrub.max = String(stages.length - 1);
 
       let stageIndex = 0;
+      const chips = (st) =>
+        `<span class="chip">goal rate <b>${(st.goalRate * 100).toFixed(0)}%</b></span>` +
+        `<span class="chip">touches/ep <b>${st.touches.toFixed(1)}</b></span>` +
+        `<span class="chip">entropy <b>${st.entropy.toFixed(2)}</b></span>` +
+        `<span class="chip">vs scripted <b>${st.vsScripted.scored}–${st.vsScripted.conceded}</b></span>` +
+        `<span class="chip">empty net <b>${st.emptyNet}/20</b></span>`;
+
       function showStage(i) {
         stageIndex = clamp(i, 0, stages.length - 1);
         const st = stages[stageIndex];
@@ -505,19 +530,52 @@
         stageMatch.score = [0, 0];
         stageMatch.arena.reset();
         scrub.value = String(stageIndex);
+
+        if (hacked) {
+          // the two runs snapshot at the same episode counts
+          const stB = hacked.stages[Math.min(stageIndex, hacked.stages.length - 1)];
+          hackedAgent.policy = window.ML.MLP.fromJSON(stB.policy);
+          hackedMatch.score = [0, 0];
+          hackedMatch.arena.reset();
+          if (labelB) {
+            labelB.innerHTML = `<b>${stB.label}</b> <span class="muted">— ` +
+              `${stB.episodes.toLocaleString()} episodes on the broken reward</span>` +
+              `<div style="margin-top:6px">${chips(stB)}</div>`;
+          }
+        }
+
+        const shown = compare === 'chaser' && hacked
+          ? hacked.stages[Math.min(stageIndex, hacked.stages.length - 1)] : st;
         label.innerHTML =
-          `<b>${st.label}</b> <span class="muted">— after ${st.episodes.toLocaleString()} episodes ` +
-          `of self-play</span>`;
-        detail.innerHTML =
-          `<span class="chip">goal rate <b>${(st.goalRate * 100).toFixed(0)}%</b></span>` +
-          `<span class="chip">touches/ep <b>${st.touches.toFixed(1)}</b></span>` +
-          `<span class="chip">entropy <b>${st.entropy.toFixed(2)}</b></span>` +
-          `<span class="chip">vs scripted bot <b>${st.vsScripted.scored}–${st.vsScripted.conceded}</b></span>` +
-          `<span class="chip">empty net <b>${st.emptyNet}/20</b></span>`;
+          `<b>${shown.label}</b> <span class="muted">— after ${shown.episodes.toLocaleString()} ` +
+          'episodes of self-play</span>';
+        detail.innerHTML = chips(shown);
         stageChart.marker = st.episodes;
         stageChart2.marker = st.episodes;
         stageChart.draw();
         stageChart2.draw();
+      }
+
+      /* Which run is on screen. "Side by side" is the point of the panel: the
+         same algorithm, the same training budget, two reward functions. */
+      if (hacked) {
+        pills(compareWrap, [
+          { value: 'good', label: 'Well-shaped rewards' },
+          { value: 'chaser', label: 'Ball-chaser rewards' },
+          { value: 'both', label: 'Side by side' },
+        ], 'good', (v) => {
+          compare = v;
+          const showB = v !== 'good';
+          canvasB.parentElement.hidden = !showB;
+          document.getElementById('stage-arena').classList.toggle('twin', v === 'both');
+          // in single-run mode the main canvas shows whichever run is selected
+          stageMatch.canvas.parentElement.hidden = v === 'chaser';
+          showStage(stageIndex);
+          // A canvas sized while hidden has zero width, so both arenas re-measure
+          // once the new layout has been applied.
+          requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+        });
+        canvasB.parentElement.hidden = true;
       }
 
       scrub.addEventListener('input', () => showStage(+scrub.value));
@@ -537,7 +595,15 @@
         { value: 'selfplay', label: 'Against itself' },
         { value: 'vs-scripted', label: 'Against the scripted bot' },
         { value: 'solo', label: 'Empty net' },
-      ], 'selfplay', (v) => { stageMatch.mode = v; stageMatch.arena.reset(); });
+      ], 'selfplay', (v) => {
+        // both arenas play the same scenario, so a side-by-side is a fair one
+        for (const m of [stageMatch, hackedMatch]) {
+          if (!m) continue;
+          m.mode = v;
+          m.arena.reset();
+          m.score = [0, 0];
+        }
+      });
 
       document.getElementById('stage-adopt').addEventListener('click', () => {
         trainer.policy = window.ML.MLP.fromJSON(stages[stageIndex].policy);
@@ -555,8 +621,8 @@
       showStage(stages.length - 1);          // open on the finished agent
 
       rafLoop((dt) => {
-        stageMatch.update(dt);
-        stageMatch.render();
+        if (compare !== 'chaser') { stageMatch.update(dt); stageMatch.render(); }
+        if (hackedMatch && compare !== 'good') { hackedMatch.update(dt); hackedMatch.render(); }
         if (playing) {
           playTimer += dt;
           if (playTimer > 3.5) {

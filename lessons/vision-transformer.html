@@ -24,6 +24,11 @@
   .pbar.best .d, .pbar.best .v { color: var(--good); font-weight: 700; }
   .pbar.best .track i { background: var(--good); }
   .chip b { color: var(--accent-2); }
+  .head-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .head-cell { text-align: center; padding: 5px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; }
+  .head-cell:hover { border-color: var(--line); }
+  .head-cell.sel { border-color: var(--accent-2); background: rgba(124,92,255,.10); }
+  .head-label { font-size: .72rem; color: var(--text-mute); margin-top: 4px; }
   .qkv { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 16px 0; }
   .qkv .panel b { color: var(--accent-2); }
   .eq { background: #0d1320; border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px;
@@ -135,8 +140,10 @@
             </div>
           </div>
         </div>
+        <div id="attn-predict"></div>
         <div style="margin-top:14px" id="attn-mode"></div>
         <div id="attn-top" style="margin-top:10px"></div>
+        <div id="head-strip" style="margin-top:16px"></div>
       </div>
 
       <div class="panel">
@@ -175,12 +182,16 @@
           <div class="field"><label class="row"><span>Architecture</span></label></div>
           <div id="arch-toggles"></div>
           <div class="desc" style="font-size:.78rem;color:var(--text-mute);margin-top:8px">
-            Two real design choices, switchable. The <b>class token</b> is an extra learned token that
+            Three real design choices, switchable. The <b>class token</b> is an extra learned token that
             attends to every patch and whose output feeds the classifier — the arrangement used by the
             ViT paper. The alternative simply averages the patch tokens. <b>LayerNorm</b> normalises
             each token before each block, which is what makes deep stacks trainable at all.
             Both default to <em>off</em> here, because at this size both measurably slow learning
             down. Turn them on and see for yourself — that comparison is the point.
+            <b>Heads</b> splits the embedding into independent slices that each run their own
+            comparison, so different heads can attend to different relationships instead of being
+            forced to average them into one map — switch to 2 or 4 and a strip appears under the
+            attention panel showing each head on its own.
           </div>
         </div>
       </div>
@@ -228,12 +239,15 @@
       this page is the load-bearing idea with the scaffolding removed — and it does genuinely learn,
       passing 85% on ten classes given a couple of minutes. Worth holding next to the CNN, which
       reaches 99% on the same data in about twenty seconds.</p>
-      <p class="mb0">The two switches above are worth taking seriously as a lesson in themselves.
-      A class token and LayerNorm are both standard, both unambiguously correct at scale, and both
-      make <em>this</em> model learn measurably slower — on a fixed 30-second budget, averaging the
-      patches with no normalisation beat the textbook arrangement by more than ten points. Machinery
-      that is essential for a 12-block model on a hundred million images is overhead for a 1-block
-      model on three thousand. "Best practice" is always best practice <em>at some scale</em>.</p>
+      <p class="mb0">The switches above are worth taking seriously as a lesson in themselves. A class
+      token, LayerNorm and multiple attention heads are all standard, all unambiguously correct at
+      scale, and all three make <em>this</em> model learn measurably slower. On a fixed 40-second
+      budget from an identical seed, one head reached 92% while two reached 72% and four reached 69% —
+      with the same parameter count, because splitting 24 features into four heads leaves each
+      comparison working in six dimensions. Machinery that is essential for a 12-block model on a
+      hundred million images is overhead for a 1-block model on three thousand. "Best practice" is
+      always best practice <em>at some scale</em>, and the switches are there so you can measure that
+      claim rather than take my word for it.</p>
     </div>
   </div>
 
@@ -246,10 +260,13 @@
       <li><strong>Watch "what the classifier reads" after training.</strong> The bright patches
         usually sit on the digit's strokes rather than the empty background. Nobody labelled the
         strokes; attention found them because they carry the information.</li>
-      <li><strong>Turn the class token and LayerNorm on, and time it.</strong> Give each combination
-        the same thirty seconds from a fresh reset and compare test accuracy. You are running an
-        ablation study — the same experiment, and the same reasoning, that decides what goes into a
-        real architecture.</li>
+      <li><strong>Run the ablation yourself.</strong> Fix the seed, pin the curve, then flip one
+        switch — class token, LayerNorm, or the number of heads — and give it the same time from a
+        fresh reset. The pinned dashed curve is the control. That is an ablation study, and it is the
+        same experiment and the same reasoning that decides what goes into a real architecture.</li>
+      <li><strong>Switch to 4 heads and watch the strip.</strong> Each head gets its own map, and
+        with only six dimensions each they tend to look alike here — the specialisation you read
+        about in papers needs far more width per head than this model has to give.</li>
       <li><strong>Set patches to 10×10 (a 2×2 grid).</strong> Four tokens is nearly no spatial
         resolution and accuracy collapses. Then try 2×2 patches: 100 tokens, far more attention
         arithmetic, slower training — and not obviously better at this size.</li>

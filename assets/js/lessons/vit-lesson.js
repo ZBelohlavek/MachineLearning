@@ -17,7 +17,8 @@
     nextLinks(document.getElementById('next-links'), 'cnn', 'gridworld', '../');
 
     let patch = 4, dim = 24, lr = 0.004, batchSize = 16, aug = 1;
-    let useCLS = false, useNorm = false, trainSize = 3000;
+    let useCLS = false, useNorm = false, trainSize = 3000, heads = 1;
+    let viewHead = -1;                      // -1 = averaged over all heads
     let net, trainSet, testSet, running = false, seen = 0, epoch = 0, pretrained = false, fromScratch = true;
     const trainedArch = { cls: false, mean: false };
 
@@ -43,15 +44,17 @@
     /* ---------------------------------------------------------- model */
     function build() {
       rng = mulberry32(seed + 7919);
-      net = new ViT({ imgSize: S, patch, dim, mlpHidden: dim * 2, classes: 10, rand: rng, useCLS, useNorm });
+      net = new ViT({ imgSize: S, patch, dim, mlpHidden: dim * 2, classes: 10, rand: rng,
+                      useCLS, useNorm, heads });
       window.__vit = net;                      // used by tools/train-vision.cjs
-      net.arch = { patch, dim, useCLS, useNorm };
+      net.arch = { patch, dim, useCLS, useNorm, heads };
 
       pretrained = false;
       fromScratch = true;
       const saved = window.ML_VIT_MODEL;
       if (saved && saved.arch && saved.arch.patch === patch && saved.arch.dim === dim &&
-          saved.arch.useCLS === useCLS && saved.arch.useNorm === useNorm) {
+          saved.arch.useCLS === useCLS && saved.arch.useNorm === useNorm &&
+          (saved.arch.heads || 1) === heads) {
         try { net.loadJSON(saved.model); pretrained = true; fromScratch = false; seen = saved.seen || 0; epoch = saved.epoch || 0; }
         catch (err) { console.warn('could not load the pre-trained ViT:', err); }
       }
@@ -63,6 +66,7 @@
       setStat('patches', `${net.grid}×${net.grid}${net.useCLS ? ' + cls' : ''}`);
       buildPatchStrip();
       buildPosPanel();
+      buildHeadStrip();
       refreshAll();
     }
 
@@ -170,9 +174,9 @@
       // lives at token p+1 and the overlays drop that first column.
       let weights = null;
       const off = clsOff();
-      if (attnMode === 'from') weights = net.attentionFrom(selected + off).subarray(off);
-      else if (attnMode === 'to') weights = net.attentionTo(selected + off).subarray(off);
-      else weights = net.clsAttention();
+      if (attnMode === 'from') weights = net.attentionFrom(selected + off, viewHead).subarray(off);
+      else if (attnMode === 'to') weights = net.attentionTo(selected + off, viewHead).subarray(off);
+      else weights = net.clsAttention(viewHead);
       let max = 0;
       for (const w of weights) max = Math.max(max, w);
       for (let t = 0; t < net.Tp; t++) {
@@ -201,7 +205,7 @@
 
     function drawAttnMatrix() {
       const T = net.T;
-      grayTile(attnCanvas, net.attn.A, T, T, { mode: 'heat' });
+      grayTile(attnCanvas, net.map(viewHead), T, T, { mode: 'heat' });
       const ctx = attnCanvas._ctx;
       const row = attnMode === 'cls' ? 0 : selected + clsOff();
       ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
@@ -235,6 +239,83 @@
         grayTile(stripTiles[t].canvas, net.patches.subarray(t * pd, (t + 1) * pd), p, p);
         stripTiles[t].wrap.classList.toggle('sel', t === selected);
       }
+    }
+
+    /* -------- predict, then check --------
+       Measured on the model you trained: how much of the classifier's attention
+       lands on patches that contain ink, against how much would land there if
+       attention were spread evenly.
+       -------------------------------------- */
+    const attnPredict = window.ML.predictBox(document.getElementById('attn-predict'), {
+      id: 'vit-attention-target',
+      question: 'Once it can classify digits, where will the classifier\'s attention concentrate?',
+      hint: 'Measured on your own trained model.',
+      options: [
+        { label: 'On the strokes', value: 'strokes' },
+        { label: 'On the empty background', value: 'background' },
+        { label: 'Spread evenly', value: 'even' },
+      ],
+    });
+
+    function scoreAttentionPrediction() {
+      if (!attnPredict || attnPredict.choice === null || !current) return;
+      net.forward(current);
+      const w = net.clsAttention(-1);
+      const pd = net.patchDim;
+      let inkAttn = 0, inkPatches = 0, totalAttn = 0;
+      for (let t = 0; t < net.Tp; t++) {
+        let ink = 0;
+        for (let i = 0; i < pd; i++) ink += net.patches[t * pd + i];
+        totalAttn += w[t];
+        if (ink > pd * 0.12) { inkAttn += w[t]; inkPatches++; }
+      }
+      if (!inkPatches || !totalAttn) return;
+      const share = inkAttn / totalAttn;                 // attention landing on ink
+      const area = inkPatches / net.Tp;                  // ink's share of the image
+      const ratio = share / area;
+      const verdict = ratio > 1.25 ? 'strokes' : ratio < 0.8 ? 'background' : 'even';
+      attnPredict.reveal(verdict,
+        `On this digit, ${(share * 100).toFixed(0)}% of the classifier's attention lands on the ` +
+        `${(area * 100).toFixed(0)}% of patches that contain ink — ${ratio.toFixed(2)}× its fair ` +
+        `share. Nobody labelled the strokes; attention concentrated there because that is where the ` +
+        'information is.');
+    }
+
+    /* -------- one attention map per head -------- */
+    let headTiles = [];
+    function buildHeadStrip() {
+      const host = document.getElementById('head-strip');
+      if (!host) return;
+      host.innerHTML = '';
+      headTiles = [];
+      const wrapRow = document.createElement('div');
+      wrapRow.className = 'head-row';
+      host.appendChild(wrapRow);
+
+      const mk = (label, index) => {
+        const cell = document.createElement('div');
+        cell.className = 'head-cell' + (index === viewHead ? ' sel' : '');
+        cell.title = index < 0 ? 'Average of all heads' : 'Attention map for head ' + (index + 1);
+        const c = tile(cell, net.T > 40 ? 58 : 74, 'headtile');
+        const lab = document.createElement('div');
+        lab.className = 'head-label';
+        lab.textContent = label;
+        cell.appendChild(lab);
+        cell.addEventListener('click', () => { viewHead = index; buildHeadStrip(); refreshAll(); });
+        wrapRow.appendChild(cell);
+        headTiles.push({ canvas: c, index, cell });
+      };
+
+      if (net.attn.H > 1) mk('all heads', -1);
+      for (let h = 0; h < net.attn.H; h++) mk('head ' + (h + 1), h);
+      if (net.attn.H === 1) viewHead = -1;
+      host.style.display = net.attn.H > 1 ? '' : 'none';
+    }
+
+    function drawHeadStrip() {
+      if (!headTiles.length) return;
+      const T = net.T;
+      for (const ht of headTiles) grayTile(ht.canvas, net.map(ht.index), T, T, { mode: 'heat' });
     }
 
     /* -------- position embedding similarity -------- */
@@ -291,12 +372,13 @@
         `Prediction: <b>${best}</b> <span class="muted">(${(probs[best] * 100).toFixed(1)}%)</span>`;
       drawMain();
       drawAttnMatrix();
+      drawHeadStrip();
       drawPatchStrip();
       drawPosPanel();
       const off = clsOff();
-      const w = attnMode === 'from' ? net.attentionFrom(selected + off).subarray(off)
-              : attnMode === 'to' ? net.attentionTo(selected + off).subarray(off)
-              : net.clsAttention();
+      const w = attnMode === 'from' ? net.attentionFrom(selected + off, viewHead).subarray(off)
+              : attnMode === 'to' ? net.attentionTo(selected + off, viewHead).subarray(off)
+              : net.clsAttention(viewHead);
       const idx = Array.from(w).map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).slice(0, 4);
       document.getElementById('attn-top').innerHTML = idx
         .map(([v, i]) => `<span class="chip">patch ${i} <b>${(v * 100).toFixed(1)}%</b></span>`)
@@ -388,6 +470,11 @@
       { value: 'nonorm', label: 'LayerNorm off' },
       { value: 'norm', label: 'LayerNorm on' },
     ], 'nonorm', (v) => { useNorm = v === 'norm'; build(); });
+    pills(document.getElementById('arch-toggles'), [
+      { value: 1, label: '1 head' },
+      { value: 2, label: '2 heads' },
+      { value: 4, label: '4 heads' },
+    ], 1, (v) => { heads = v; viewHead = -1; build(); });
 
     pills(document.getElementById('attn-mode'), [
       { value: 'cls', label: 'What the classifier reads' },
@@ -468,6 +555,7 @@
           evalCountdown = 3;
           const te = evaluate();
           setStat('test acc', (te * 100).toFixed(1) + '%', te > 0.9 ? 'good' : '');
+          if (te > 0.6) scoreAttentionPrediction();
           if (te >= 0.8 && fromScratch) {
             achieve('vit-trained', `${(te * 100).toFixed(1)}% test accuracy on ten classes`);
           }

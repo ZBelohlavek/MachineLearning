@@ -455,6 +455,86 @@
     return { get seed() { return seed; }, set: apply, refresh };
   }
 
+  /**
+   * Predict, then check.
+   *
+   * Commit to an answer before the page reveals it. Being wrong on a
+   * prediction you actually made is far stickier than reading the right answer
+   * first — and unlike the quizzes, these are scored against what your own run
+   * really does, not against a stored answer.
+   *
+   * predictBox(parent, { id, question, options:[{label,value}], hint })
+   *   .reveal(actualValue, message)   scores the prediction once the run knows
+   */
+  function predictBox(parent, opts) {
+    if (!parent) return null;
+    const KEY = 'mlbb-predict';
+    const store = () => {
+      try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (err) { return {}; }
+    };
+    const saved = store()[opts.id];
+    let choice = saved === undefined ? null : saved;
+    let revealed = null;
+
+    const box = document.createElement('div');
+    box.className = 'predict';
+    box.innerHTML = `
+      <div class="predict-head"><b>Predict first</b><span>${opts.hint || 'Then run it and find out.'}</span></div>
+      <div class="predict-q">${opts.question}</div>
+      <div class="predict-opts"></div>
+      <div class="predict-result" hidden></div>`;
+    const optHost = box.querySelector('.predict-opts');
+    const result = box.querySelector('.predict-result');
+    parent.appendChild(box);
+
+    const buttons = opts.options.map((o) => {
+      const b = document.createElement('button');
+      b.className = 'pill';
+      b.textContent = o.label;
+      b.addEventListener('click', () => {
+        if (choice !== null) return;
+        choice = o.value;
+        const s = store();
+        s[opts.id] = choice;
+        try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (err) { /* private mode */ }
+        render();
+      });
+      optHost.appendChild(b);
+      return b;
+    });
+
+    function render() {
+      buttons.forEach((b, i) => {
+        const v = opts.options[i].value;
+        b.classList.toggle('active', choice === v);
+        b.classList.toggle('correct', revealed !== null && v === revealed);
+        b.classList.toggle('wrong', revealed !== null && v === choice && choice !== revealed);
+        b.disabled = choice !== null;
+      });
+      result.hidden = choice === null;
+      if (choice !== null && revealed === null) {
+        result.className = 'predict-result waiting';
+        result.innerHTML = '<b>Locked in.</b> Now train it and see whether you were right.';
+      } else if (revealed !== null) {
+        const right = choice === revealed;
+        result.className = 'predict-result ' + (right ? 'right' : 'nope');
+        result.innerHTML = `<b>${right ? 'You called it.' : 'Not what happened.'}</b> ${revealMsg}`;
+      }
+    }
+
+    let revealMsg = '';
+    render();
+    return {
+      get choice() { return choice; },
+      reveal(actualValue, message) {
+        if (choice === null || revealed !== null) return;   // no prediction, or already scored
+        revealed = actualValue;
+        revealMsg = message || '';
+        render();
+      },
+    };
+  }
+
   /* ------------------------- controls ------------------------- */
 
   /**
@@ -627,6 +707,6 @@
   }
 
   return { LESSONS, BADGES, chrome, nextLinks, achieve, badgesEarned, onBadge,
-           quiz, goalPanel, dpad, runBar, slider, pills, checkbox, statGrid,
+           quiz, goalPanel, dpad, runBar, predictBox, slider, pills, checkbox, statGrid,
            rafLoop, pointerPos };
 });

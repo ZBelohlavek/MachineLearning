@@ -164,8 +164,13 @@ function run(name, loss, blocks, rand, opts = {}) {
   ], rand, { perEps: 1e-3 });
 }
 
-/* ---------------------------- the whole vision transformer, both variants */
-for (const cfg of [{ useCLS: true, useNorm: true }, { useCLS: false, useNorm: false }]) {
+/* ---------------------------- the whole vision transformer, several variants */
+for (const cfg of [
+  { useCLS: true, useNorm: true },
+  { useCLS: false, useNorm: false },
+  { useCLS: false, useNorm: false, heads: 2 },
+  { useCLS: true, useNorm: true, heads: 4 },
+]) {
   const rand = nn.mulberry32(17);
   const net = new vitLib.ViT({ imgSize: 8, patch: 2, dim: 16, mlpHidden: 32, classes: 4, rand, ...cfg });
   const img = new Float32Array(64).map(() => rand());
@@ -174,8 +179,8 @@ for (const cfg of [{ useCLS: true, useNorm: true }, { useCLS: false, useNorm: fa
   net.zeroGrad();
   net.backward(net.lossAndGrad(net.forward(img), label).dLogits);
   const blocks = net.params().map((p) => ({ values: p.v, grads: p.g }));
-  run(`vit.js  ViT (${cfg.useCLS ? 'class token' : 'mean pool'}, ${cfg.useNorm ? 'norm' : 'no norm'})`,
-      loss, blocks, rand);
+  run(`vit.js  ViT (${cfg.useCLS ? 'cls' : 'mean'}, ${cfg.useNorm ? 'norm' : 'no norm'}, ` +
+      `${cfg.heads || 1} head${(cfg.heads || 1) > 1 ? 's' : ''})`, loss, blocks, rand);
 }
 
 /* --------------- the RL environment: sanity rather than gradients -------- */
