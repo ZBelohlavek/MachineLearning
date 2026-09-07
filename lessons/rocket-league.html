@@ -44,6 +44,8 @@
     </p>
   </div>
 
+  <div id="lesson-goals"></div>
+
   <!-- ============================================================ -->
   <div class="section">
     <h2>Why this can't be taught the normal way</h2>
@@ -101,7 +103,7 @@
           <h3>The arena</h3>
           <span class="hint">click the arena first, then use the arrow keys</span>
         </div>
-        <canvas id="sandbox-canvas" class="stage"></canvas>
+        <canvas id="sandbox-canvas" class="stage" role="img" aria-label="Top-down Rocket League arena. Drive the blue car with the arrow keys."></canvas>
         <div id="sandbox-controls" style="margin-top:12px"></div>
       </div>
 
@@ -123,7 +125,7 @@
         <h3>What the agent actually sees</h3>
         <span class="hint">24 numbers, updated 30× a second</span>
       </div>
-      <canvas id="obs-canvas" class="fit"></canvas>
+      <canvas id="obs-canvas" class="fit" role="img" aria-label="The 24 numbers the agent receives as its observation, updated live."></canvas>
       <p style="margin-top:12px">
         There are no pixels here. The policy never sees the picture above — it sees these 24 numbers,
         and nothing else. Two design decisions in this list do most of the heavy lifting:
@@ -201,7 +203,7 @@
           <span class="hint">drag the slider to move through the run</span>
         </div>
         <div id="timelapse-body">
-          <canvas id="stage-canvas" class="stage"></canvas>
+          <canvas id="stage-canvas" class="stage" role="img" aria-label="Training timelapse: the agent playing with the weights it had at the selected checkpoint."></canvas>
           <div id="stage-label" style="margin-top:12px;font-size:.95rem"></div>
           <div id="stage-detail" style="margin-top:8px"></div>
           <input type="range" id="stage-scrub" min="0" max="1" step="1" value="0" style="margin-top:14px">
@@ -223,8 +225,8 @@
 
       <div class="panel">
         <div class="panel-title"><h3>The run this came from</h3></div>
-        <canvas id="stage-chart" class="fit"></canvas>
-        <canvas id="stage-chart2" class="fit" style="margin-top:10px"></canvas>
+        <canvas id="stage-chart" class="fit" role="img" aria-label="Recorded goal rate across the pre-trained run."></canvas>
+        <canvas id="stage-chart2" class="fit" style="margin-top:10px" role="img" aria-label="Recorded ball touches per episode across the pre-trained run."></canvas>
         <p class="muted" style="font-size:.84rem;margin-top:12px">
           The dashed line marks where you are. Notice the shape: almost nothing happens for hundreds
           of episodes, then touches climb, and only after that do goals follow. Learning is not
@@ -312,7 +314,7 @@
           <h3>Live self-play match</h3>
           <span class="hint">both cars share one brain</span>
         </div>
-        <canvas id="train-canvas" class="stage"></canvas>
+        <canvas id="train-canvas" class="stage" role="img" aria-label="Live self-play match between two agents sharing one policy network."></canvas>
         <div class="controls" style="margin-top:12px">
           <button id="btn-train" class="primary">▶ Start training</button>
           <button id="btn-eval">Evaluate</button>
@@ -340,9 +342,9 @@
         <div class="panel-title"><h3>Progress</h3></div>
         <div id="train-stats"></div>
         <div style="margin-top:14px">
-          <canvas id="chart-reward" class="fit"></canvas>
-          <canvas id="chart-skill" class="fit" style="margin-top:10px"></canvas>
-          <canvas id="chart-learn" class="fit" style="margin-top:10px"></canvas>
+          <canvas id="chart-reward" class="fit" role="img" aria-label="Chart of reward per episode over training."></canvas>
+          <canvas id="chart-skill" class="fit" style="margin-top:10px" role="img" aria-label="Chart of goal rate and ball touches per episode over training."></canvas>
+          <canvas id="chart-learn" class="fit" style="margin-top:10px" role="img" aria-label="Chart of policy entropy and policy change over training."></canvas>
         </div>
         <p class="muted" style="font-size:.8rem;margin-top:10px">
           Reward per episode is the number being optimised, but it is not the score you care about —
@@ -383,7 +385,7 @@
     <div class="split">
       <div class="panel">
         <div class="panel-title"><h3>Activations</h3></div>
-        <canvas id="net-canvas" class="fit"></canvas>
+        <canvas id="net-canvas" class="fit" role="img" aria-label="Activations of the policy network: observation, two hidden layers and action scores."></canvas>
         <div id="value-readout" style="margin-top:10px;font-size:.85rem;color:var(--text-dim)"></div>
       </div>
       <div class="panel">
@@ -439,12 +441,22 @@
     </ul>
   </div>
 
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on what you just made happen. They are not a test you can fail — the
+      explanation appears either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
   <div id="next-links"></div>
 </div>
 
 <script src="../assets/js/lib/nn.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/models/rocket-stages.js"></script>
 <script src="../assets/js/lessons/rocket-env.js"></script>
 <script src="../assets/js/lessons/rocket-train.js"></script>

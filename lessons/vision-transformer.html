@@ -44,6 +44,8 @@
     </p>
   </div>
 
+  <div id="lesson-goals"></div>
+
   <div class="section">
     <h2>Step 1 · An image becomes a sequence</h2>
     <p>
@@ -68,6 +70,7 @@
       <div style="margin-top:14px">
         <div class="field"><label class="row"><span>Patch size</span></label></div>
         <div id="patch-pills"></div>
+        <div id="patch-hint" class="desc" style="font-size:.8rem;color:var(--text-mute);margin-top:10px"></div>
       </div>
       <p class="muted" style="font-size:.82rem;margin:12px 0 0">
         Patch size is the central trade in a ViT. Big patches mean few tokens and cheap attention,
@@ -123,9 +126,9 @@
       <div class="panel">
         <div class="panel-title"><h3>Attention on this image</h3><span class="hint">click a patch</span></div>
         <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
-          <canvas id="vit-image"></canvas>
+          <canvas id="vit-image" role="img" aria-label="The digit divided into patches, overlaid with the attention map. Click a patch to inspect it."></canvas>
           <div>
-            <canvas id="attn-matrix"></canvas>
+            <canvas id="attn-matrix" role="img" aria-label="The full attention matrix: row t, column u is how much patch t attends to patch u."></canvas>
             <div class="muted" style="font-size:.74rem;margin-top:6px;max-width:220px">
               The full attention matrix: row <i>t</i>, column <i>u</i> is how much patch <i>t</i>
               attends to patch <i>u</i>. Every row sums to 1.
@@ -142,7 +145,7 @@
         <div id="vit-probs"></div>
         <div style="margin-top:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
           <div>
-            <canvas id="vit-pad"></canvas>
+            <canvas id="vit-pad" role="img" aria-label="Drawing pad for the transformer. Drag to draw a digit."></canvas>
             <div class="muted" style="font-size:.74rem;margin-top:5px">draw a digit here</div>
           </div>
           <div class="controls" style="flex-direction:column;align-items:stretch">
@@ -162,7 +165,7 @@
           <button id="btn-reset" class="danger">Start over</button>
           <button id="btn-regen" class="small">New data</button>
         </div>
-        <canvas id="vit-chart" class="fit" style="margin-top:14px"></canvas>
+        <canvas id="vit-chart" class="fit" style="margin-top:14px" role="img" aria-label="Chart of transformer training and test accuracy."></canvas>
       </div>
       <div class="panel">
         <div class="panel-title"><h3>Configuration</h3></div>
@@ -262,6 +265,15 @@
     </ul>
   </div>
 
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on what you just made happen. They are not a test you can fail — the
+      explanation appears either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
   <div id="next-links"></div>
 </div>
 
@@ -272,6 +284,7 @@
 <script src="../assets/models/vit-digits.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/js/lessons/vit-lesson.js"></script>
 </body>
 </html>

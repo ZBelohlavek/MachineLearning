@@ -64,6 +64,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     chrome('foundations', '../');
+    window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.foundations);
+    window.ML.goalPanel(document.getElementById('lesson-goals'), 'foundations');
     nextLinks(document.getElementById('next-links'), null, 'convolutions', '../');
 
     /* ---------------- state ---------------- */
@@ -447,6 +449,11 @@
 
       if (dataset === 'spiral' && te.acc >= 0.9 && epoch > 20) {
         achieve('foundations-spiral', `${(te.acc * 100).toFixed(1)}% on held-out spiral points`);
+        const units = hidden.filter((h) => h > 0).reduce((a, b) => a + b, 0);
+        if (units > 0 && units <= 8) {
+          achieve('foundations-lean',
+            `${(te.acc * 100).toFixed(1)}% on the spiral with only ${units} hidden neurons`);
+        }
       }
       // Overfitting: test loss has climbed well past its best while training loss kept falling.
       if (te.loss < minTestLoss) { minTestLoss = te.loss; trainLossAtMin = tr.loss; }

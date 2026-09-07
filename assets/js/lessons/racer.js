@@ -192,10 +192,13 @@
      ==================================================================== */
   document.addEventListener('DOMContentLoaded', () => {
     chrome('racer', '../');
+    window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.racer);
+    window.ML.goalPanel(document.getElementById('lesson-goals'), 'racer');
     nextLinks(document.getElementById('next-links'), 'gridworld', 'rocket', '../');
 
     const rand = mulberry32(20240607);
     const track = new Track();
+    window.__racer = { track };            // handy from the console, and used by the tests
 
     let popSize = 60, mutation = 0.12, elitePct = 0.2, speedMult = 3;
     let showAll = true, showSensors = true;
@@ -275,6 +278,31 @@
     }
 
     /* ---------------- simulation ---------------- */
+
+    /**
+     * Drawing can break the course: erase the road under the start and every
+     * car dies on its first tick; erase the finish and there is nothing to
+     * reach. Either way the population would churn through generations with no
+     * feedback, so say what is wrong instead.
+     */
+    function trackProblem() {
+      if (!track.onRoad(track.start.x, track.start.y)) {
+        return 'The start square is off the road — draw some road under the blue S.';
+      }
+      const si = (track.start.y | 0) * GW + (track.start.x | 0);
+      if (track.dist[si] < 0) {
+        return 'There is no route from S to F any more — the road is broken somewhere between them.';
+      }
+      return '';
+    }
+
+    function showTrackProblem(msg) {
+      const el = document.getElementById('track-warning');
+      if (!el) return;
+      el.textContent = msg;
+      el.hidden = !msg;
+    }
+
     function simStep() {
       let anyAlive = false;
       for (const car of cars) {
@@ -586,8 +614,18 @@
     ], 3, (v) => { speedMult = v; });
     checkbox(cfg, 'Show the whole population', true, (v) => { showAll = v; });
     checkbox(cfg, 'Show the leader’s sensors', true, (v) => { showSensors = v; });
-    const drawMode = checkbox(cfg, 'Draw on the track with the mouse', false, () => {});
-    pills(cfg, [
+
+    // The brush lives beside the canvas, not in the settings panel below it —
+    // you should not have to scroll away from the track to start drawing on it.
+    const drawHost = document.getElementById('draw-controls');
+    const drawMode = checkbox(drawHost, 'Draw on the track with the mouse', false, (v) => {
+      brushPills.style.display = v ? '' : 'none';
+      canvas.style.cursor = v ? 'crosshair' : 'default';
+    });
+    const brushPills = document.createElement('div');
+    brushPills.style.display = 'none';
+    drawHost.appendChild(brushPills);
+    pills(brushPills, [
       { value: false, label: 'Brush: add road' },
       { value: true, label: 'Brush: erase' },
     ], false, (v) => { brushErase = v; });
@@ -600,9 +638,11 @@
     updateStats(0, 0, 0);
 
     rafLoop(() => {
+      const problem = trackProblem();
+      showTrackProblem(problem);
       if (mode === 'race') {
-        if (player && (player.alive || rival.alive)) raceStep();
-      } else if (running) {
+        if (!problem && player && (player.alive || rival.alive)) raceStep();
+      } else if (running && !problem) {
         for (let i = 0; i < speedMult; i++) simStep();
       }
       render();

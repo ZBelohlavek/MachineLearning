@@ -137,6 +137,8 @@
   /* ------------------------------------------------------------- page */
   document.addEventListener('DOMContentLoaded', () => {
     chrome('convolutions', '../');
+    window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.convolutions);
+    window.ML.goalPanel(document.getElementById('lesson-goals'), 'convolutions');
     nextLinks(document.getElementById('next-links'), 'foundations', 'cnn', '../');
 
     let img = SOURCES.shapes();
@@ -167,13 +169,42 @@
       inp.addEventListener('input', () => {
         const v = parseFloat(inp.value);
         kernel[i] = isFinite(v) ? v : 0;
+        kernelTyped = true;
         achieve('conv-custom', 'You edited the kernel by hand');
         recompute();
       });
       kEditor.appendChild(inp);
       kInputs.push(inp);
     }
+    let kernelTyped = false;
+
+    /**
+     * The challenge: type a kernel that finds horizontal edges. Graded by
+     * correlating its output with a Sobel-Y reference on the current image, so
+     * any scaling or sign flip of a genuine horizontal edge detector counts —
+     * and clicking the preset does not.
+     */
+    function checkEdgeChallenge() {
+      if (!kernelTyped) return;
+      const ref = convolve(img, KERNELS.sobelY);
+      let ma = 0, mb = 0;
+      for (let i = 0; i < ref.length; i++) { ma += out[i]; mb += ref[i]; }
+      ma /= ref.length; mb /= ref.length;
+      let num = 0, da = 0, db = 0;
+      for (let i = 0; i < ref.length; i++) {
+        const x = out[i] - ma, y = ref[i] - mb;
+        num += x * y; da += x * x; db += y * y;
+      }
+      if (da < 1e-6 || db < 1e-6) return;                  // a flat image proves nothing
+      const r = num / Math.sqrt(da * db);
+      if (Math.abs(r) > 0.9) {
+        achieve('conv-challenge',
+          `Your kernel matches a Sobel-Y reference at r = ${Math.abs(r).toFixed(2)}`);
+      }
+    }
+
     function setKernel(k) {
+      kernelTyped = false;
       kernel = k.slice();
       kInputs.forEach((inp, i) => (inp.value = +kernel[i].toFixed(4)));
       recompute();
@@ -372,6 +403,7 @@
       drawBank();
       drawPool();
       redraw();
+      checkEdgeChallenge();
     }
 
     /* ---------------- animation controls ---------------- */

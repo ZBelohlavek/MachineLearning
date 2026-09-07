@@ -52,6 +52,8 @@
     </p>
   </div>
 
+  <div id="lesson-goals"></div>
+
   <div class="section">
     <h2>The operation</h2>
     <p>
@@ -79,7 +81,7 @@
     <div class="split even">
       <div class="panel">
         <div class="panel-title"><h3>Input · 48×48 pixels</h3><span class="hint">click to move the window</span></div>
-        <canvas id="conv-in"></canvas>
+        <canvas id="conv-in" role="img" aria-label="Input image with the 3 by 3 convolution window. Click to move the window."></canvas>
         <div class="controls" style="margin-top:12px">
           <button id="btn-play" class="primary">▶ Scan the image</button>
           <button id="btn-step-px">One pixel</button>
@@ -88,7 +90,7 @@
       </div>
       <div class="panel">
         <div class="panel-title"><h3>Output · the feature map</h3><span class="hint">grey = zero, black/white = strong response</span></div>
-        <canvas id="conv-out"></canvas>
+        <canvas id="conv-out" role="img" aria-label="Output feature map produced by the current kernel."></canvas>
         <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
           For edge kernels the output is centred on mid-grey: zero response is grey, a strong positive
           response is white and a strong negative one is black. An edge detector doesn't say "edge
@@ -168,12 +170,12 @@
     <div class="panel">
       <div class="pool-row">
         <div>
-          <canvas id="pool-in"></canvas>
+          <canvas id="pool-in" role="img" aria-label="Feature map before max pooling."></canvas>
           <div class="bank-label">feature map · 48×48</div>
         </div>
         <div class="pool-arrow">→ max-pool 2×2 →</div>
         <div>
-          <canvas id="pool-out"></canvas>
+          <canvas id="pool-out" role="img" aria-label="Feature map after 2 by 2 max pooling, at half resolution."></canvas>
           <div class="bank-label">pooled · 24×24</div>
         </div>
       </div>
@@ -205,12 +207,22 @@
     </ul>
   </div>
 
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on what you just made happen. They are not a test you can fail — the
+      explanation appears either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
   <div id="next-links"></div>
 </div>
 
 <script src="../assets/js/lib/nn.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/js/lessons/convolutions.js"></script>
 </body>
 </html>

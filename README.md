@@ -46,12 +46,22 @@ happens, so the site ships pre-trained models and lets you skip ahead:
 Every one of them can be thrown away with a single button to get the full from-scratch experience,
 and badges only unlock for models you trained yourself.
 
-## Badges
+## Goals, challenges and quizzes
 
-Fifteen of them, tracked in `localStorage` and shown on the home page. None are for clicking around:
-they unlock when a model of yours does something — evolves a car that finishes the course, trains a
-bot that beats the scripted opponent, catches a network overfitting, or scores 8 in the 60-second
-digit duel.
+Twenty-four badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
+on the home page. None are for clicking around — each falls into one of three kinds:
+
+- **Things your model does.** Evolve a car that finishes the course, train a bot that beats the
+  scripted opponent, catch a network overfitting, score 8 in the 60-second digit duel. Loading a
+  pre-trained model does not count; badges are only for runs you trained.
+- **Auto-graded challenges.** "Type a kernel that finds horizontal edges" is checked by correlating
+  your kernel's output against a Sobel-Y reference, so any scaling or sign flip of a real edge
+  detector passes and clicking the preset does not. "Solve the spiral with 8 hidden neurons or
+  fewer" is checked the same way, against held-out accuracy.
+- **Quiz checkpoints.** Three questions at the end of every lesson, about what you just made happen
+  rather than about terminology. The explanation appears whichever answer you pick, and says why the
+  wrong answer was tempting — the questions live in `assets/js/lib/quizzes.js` so they can be read
+  and argued with as a set.
 
 ## What's actually in here
 
@@ -73,7 +83,8 @@ assets/js/lib/
   vit.js      Token linear layers, single-head self-attention, LayerNorm, a small ViT
   digits.js   A digit dataset generated with the canvas text API
   plot.js     Canvas line charts and colour maps
-  ui.js       Shared page chrome, sliders, pills, stat tiles
+  ui.js       Shared page chrome, sliders, pills, stat tiles, badges, quizzes
+  quizzes.js  The three questions and explanations for each lesson
 
 assets/js/lessons/
   rocket-env.js     Arena physics, egocentric observations, configurable rewards

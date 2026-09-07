@@ -134,6 +134,8 @@
   /* ---------------------------------------------------------------- page */
   document.addEventListener('DOMContentLoaded', () => {
     chrome('gridworld', '../');
+    window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.gridworld);
+    window.ML.goalPanel(document.getElementById('lesson-goals'), 'gridworld');
     nextLinks(document.getElementById('next-links'), 'attention', 'racer', '../');
 
     const GW = 11, GH = 8;

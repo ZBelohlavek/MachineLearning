@@ -28,6 +28,8 @@
     </p>
   </div>
 
+  <div id="lesson-goals"></div>
+
   <div class="section">
     <h2>The setup: states, actions, rewards</h2>
     <p>
@@ -62,7 +64,7 @@
           <h3>The world</h3>
           <span class="hint">click or drag on the grid to edit it</span>
         </div>
-        <canvas id="grid-canvas"></canvas>
+        <canvas id="grid-canvas" role="img" aria-label="Grid world showing learned Q-values per square. Click or drag to edit the maze."></canvas>
         <div class="controls" style="margin-top:12px">
           <button id="btn-run" class="primary">▶ Run</button>
           <button id="btn-step">Single step</button>
@@ -87,8 +89,8 @@
       <div class="panel">
         <div class="panel-title"><h3>Progress</h3></div>
         <div id="gw-stats"></div>
-        <canvas id="gw-chart" class="fit" style="margin-top:14px"></canvas>
-        <canvas id="gw-chart-r" class="fit" style="margin-top:10px"></canvas>
+        <canvas id="gw-chart" class="fit" style="margin-top:14px" role="img" aria-label="Chart of steps taken per episode."></canvas>
+        <canvas id="gw-chart-r" class="fit" style="margin-top:10px" role="img" aria-label="Chart of reward collected per episode."></canvas>
         <p class="muted" style="font-size:.8rem;margin-top:10px">
           Steps per episode is the clearest sign of learning: it starts in the hundreds — pure
           wandering — and drops toward the length of the shortest safe route.
@@ -184,12 +186,22 @@
     </div>
   </div>
 
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on what you just made happen. They are not a test you can fail — the
+      explanation appears either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
   <div id="next-links"></div>
 </div>
 
 <script src="../assets/js/lib/nn.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/js/lessons/gridworld.js"></script>
 </body>
 </html>

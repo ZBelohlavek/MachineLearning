@@ -12,6 +12,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     chrome('attention', '../');
+    window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.attention);
+    window.ML.goalPanel(document.getElementById('lesson-goals'), 'attention');
     nextLinks(document.getElementById('next-links'), 'cnn', 'gridworld', '../');
 
     let patch = 4, dim = 24, lr = 0.004, batchSize = 16, aug = 1;
@@ -357,7 +359,23 @@
       { value: 5, label: '5×5 patches (4×4 grid)' },
       { value: 4, label: '4×4 patches (5×5 grid)' },
       { value: 2, label: '2×2 patches (10×10 grid)' },
-    ], 4, (v) => { patch = v; build(); });
+    ], 4, (v) => { patch = v; build(); updatePatchHint(); });
+
+    function updatePatchHint() {
+      const el = document.getElementById('patch-hint');
+      if (!el) return;
+      const T = net.Tp;
+      const pairs = (T + (net.useCLS ? 1 : 0)) ** 2;
+      const rel = (pairs / 676).toFixed(1);
+      el.innerHTML =
+        `<b>${T} patches</b> → ${pairs.toLocaleString()} attention scores per image. ` +
+        (T >= 100
+          ? `That is about ${rel}× the arithmetic of the 5×5 setting, so training will crawl — ` +
+            'attention cost grows with the <em>square</em> of the token count, which is the single ' +
+            'biggest practical constraint on transformers and the reason patches exist at all.'
+          : 'Attention compares every token with every other, so this cost grows with the square of ' +
+            'the token count — halve the patch size and you roughly sixteen-times the work.');
+    }
 
     pills(document.getElementById('arch-toggles'), [
       { value: 'mean', label: 'Average the patch tokens' },
@@ -448,6 +466,7 @@
 
     /* ---------------------------------------------------- go */
     build();
+    updatePatchHint();
     regenerateData();
     clearPad();
     current = renderDigit(3, mulberry32(7), aug, S);

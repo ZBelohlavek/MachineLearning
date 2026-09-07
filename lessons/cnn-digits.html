@@ -61,6 +61,8 @@
     </p>
   </div>
 
+  <div id="lesson-goals"></div>
+
   <div class="section">
     <h2>The data, made from nothing</h2>
     <p>
@@ -122,7 +124,7 @@
           <button id="btn-train" class="primary">▶ Train the network</button>
           <button id="btn-reset" class="danger">Start over</button>
         </div>
-        <canvas id="cnn-chart" class="fit" style="margin-top:14px"></canvas>
+        <canvas id="cnn-chart" class="fit" style="margin-top:14px" role="img" aria-label="Chart of training and test accuracy against images seen."></canvas>
       </div>
       <div class="panel">
         <div class="panel-title"><h3>Configuration</h3><span class="hint">changing the filters rebuilds the network</span></div>
@@ -163,9 +165,9 @@
       <div class="panel">
         <div class="panel-title"><h3>Your digit</h3><span class="hint">drag to draw</span></div>
         <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
-          <canvas id="pad"></canvas>
+          <canvas id="pad" role="img" aria-label="Drawing pad. Drag to draw a digit for the network to classify."></canvas>
           <div>
-            <canvas id="pad-small"></canvas>
+            <canvas id="pad-small" role="img" aria-label="The 20 by 20 downscaled version of your drawing that the network actually sees."></canvas>
             <div class="muted" style="font-size:.74rem;margin-top:5px">what the network sees</div>
           </div>
         </div>
@@ -253,6 +255,15 @@
     </ul>
   </div>
 
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on what you just made happen. They are not a test you can fail — the
+      explanation appears either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
   <div id="next-links"></div>
 </div>
 
@@ -262,6 +273,7 @@
 <script src="../assets/models/cnn-digits.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/js/lessons/cnn-digits.js"></script>
 </body>
 </html>

@@ -21,6 +21,8 @@
   /* ------------------------------------------------------------- page */
   document.addEventListener('DOMContentLoaded', () => {
     chrome('cnn', '../');
+    window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.cnn);
+    window.ML.goalPanel(document.getElementById('lesson-goals'), 'cnn');
     nextLinks(document.getElementById('next-links'), 'convolutions', 'attention', '../');
 
     let f1 = 8, f2 = 16, hiddenUnits = 32;

@@ -129,10 +129,14 @@
       hint: 'Get 90% test accuracy on the spiral dataset' },
     { id: 'foundations-overfit', lesson: 'foundations', label: 'Caught it overfitting',
       hint: 'Make test loss climb while training loss keeps falling' },
+    { id: 'foundations-lean', lesson: 'foundations', label: 'Solved the spiral with 8 neurons',
+      hint: 'Reach 90% on the spiral using 8 hidden neurons or fewer' },
     { id: 'conv-custom', lesson: 'convolutions', label: 'Wrote your own kernel',
       hint: 'Type your own numbers into the 3×3 kernel' },
     { id: 'conv-scan', lesson: 'convolutions', label: 'Followed the window',
       hint: 'Scan a whole row of the image one pixel at a time' },
+    { id: 'conv-challenge', lesson: 'convolutions', label: 'Built a horizontal edge detector',
+      hint: 'Type a kernel that finds horizontal edges — no presets' },
     { id: 'cnn-trained', lesson: 'cnn', label: 'Trained a CNN to 95%',
       hint: 'Reach 95% test accuracy from random weights' },
     { id: 'cnn-duel', lesson: 'cnn', label: 'Won a digit duel',
@@ -155,9 +159,24 @@
       hint: 'Train an agent that beats the scripted bot' },
     { id: 'rocket-human', lesson: 'rocket', label: 'Scored on your own bot',
       hint: 'Beat your trained agent in a head-to-head match' },
+    { id: 'quiz-foundations', lesson: 'foundations', label: 'Passed the quiz',
+      hint: 'Answer all three questions correctly' },
+    { id: 'quiz-convolutions', lesson: 'convolutions', label: 'Passed the quiz',
+      hint: 'Answer all three questions correctly' },
+    { id: 'quiz-cnn', lesson: 'cnn', label: 'Passed the quiz',
+      hint: 'Answer all three questions correctly' },
+    { id: 'quiz-attention', lesson: 'attention', label: 'Passed the quiz',
+      hint: 'Answer all three questions correctly' },
+    { id: 'quiz-gridworld', lesson: 'gridworld', label: 'Passed the quiz',
+      hint: 'Answer all three questions correctly' },
+    { id: 'quiz-racer', lesson: 'racer', label: 'Passed the quiz',
+      hint: 'Answer all three questions correctly' },
+    { id: 'quiz-rocket', lesson: 'rocket', label: 'Passed the quiz',
+      hint: 'Answer all three questions correctly' },
   ];
 
   const BADGE_KEY = 'mlbb-badges';
+  const badgeListeners = [];
 
   function loadBadges() {
     try { return JSON.parse(localStorage.getItem(BADGE_KEY)) || {}; }
@@ -173,21 +192,40 @@
     store[id] = { at: Date.now(), detail: detail || '' };
     try { localStorage.setItem(BADGE_KEY, JSON.stringify(store)); } catch (err) { /* private mode */ }
     toast(badge, detail);
+
+    // Finishing every goal in a lesson deserves more than another small toast.
+    const siblings = BADGES.filter((b) => b.lesson === badge.lesson);
+    if (siblings.length > 1 && siblings.every((b) => store[b.id])) {
+      const lesson = LESSONS.find((l) => l.id === badge.lesson);
+      setTimeout(() => toast(
+        { label: `${lesson ? lesson.nav : 'Lesson'} complete`, hint: '' },
+        `Every goal in this lesson. ${remainingBadges()} left across the site.`, true), 700);
+    }
+
+    badgeListeners.forEach((fn) => fn(id));
     return true;
   }
 
+  function remainingBadges() {
+    const store = loadBadges();
+    return BADGES.filter((b) => !store[b.id]).length;
+  }
+
+  function onBadge(fn) { badgeListeners.push(fn); }
+
   function badgesEarned() { return loadBadges(); }
 
-  function toast(badge, detail) {
+  function toast(badge, detail, gold) {
     let host = document.querySelector('.toast-host');
     if (!host) {
       host = document.createElement('div');
       host.className = 'toast-host';
       document.body.appendChild(host);
     }
+    while (host.children.length >= 3) host.firstChild.remove();
     const el = document.createElement('div');
-    el.className = 'toast';
-    el.innerHTML = `<span class="medal">★</span><div><b>${badge.label}</b>` +
+    el.className = 'toast' + (gold ? ' gold' : '');
+    el.innerHTML = `<span class="medal">${gold ? '🏆' : '★'}</span><div><b>${badge.label}</b>` +
       `<span>${detail || badge.hint}</span></div>`;
     host.appendChild(el);
     requestAnimationFrame(() => el.classList.add('in'));
@@ -195,6 +233,153 @@
       el.classList.remove('in');
       setTimeout(() => el.remove(), 400);
     }, 4200);
+  }
+
+  /**
+   * The goals for one lesson, rendered inside that lesson and kept up to date
+   * as they are earned. Seeing what is worth aiming for turns a page you read
+   * into a page you do something with.
+   */
+  function goalPanel(container, lessonId) {
+    if (!container) return;
+    const list = BADGES.filter((b) => b.lesson === lessonId);
+    if (!list.length) return;
+    const render = () => {
+      const earned = loadBadges();
+      const done = list.filter((b) => earned[b.id]).length;
+      container.className = 'goals' + (done === list.length ? ' complete' : '');
+      container.innerHTML =
+        `<div class="goals-head">
+           <b>${done === list.length ? 'Every goal in this lesson is done' : 'Goals in this lesson'}</b>
+           <span class="mono">${done} / ${list.length}</span>
+         </div>
+         <div class="badge-row">` +
+        list.map((b) => `<span class="badge ${earned[b.id] ? 'earned' : ''}" title="${b.label}">
+            <i>${earned[b.id] ? '★' : '☆'}</i>${earned[b.id] ? b.label : b.hint}</span>`).join('') +
+        '</div>';
+    };
+    render();
+    onBadge(render);
+  }
+
+  /* ==========================================================================
+     Quiz checkpoints — a few questions per lesson about what you just did,
+     with the reasoning shown after you answer. Answers persist, so returning
+     to a lesson shows what you already worked out.
+     ========================================================================== */
+
+  const QUIZ_KEY = 'mlbb-quiz';
+
+  function quizState() {
+    try { return JSON.parse(localStorage.getItem(QUIZ_KEY)) || {}; }
+    catch (err) { return {}; }
+  }
+  function saveQuizState(state) {
+    try { localStorage.setItem(QUIZ_KEY, JSON.stringify(state)); } catch (err) { /* private mode */ }
+  }
+
+  /**
+   * quiz(container, { id, title, intro, badge, questions:[{ q, options, answer, why }] })
+   * `answer` is the index of the correct option; `why` is shown either way.
+   */
+  function quiz(container, spec) {
+    if (!container) return;
+    const store = quizState();
+    const saved = store[spec.id] || {};
+    const chosen = {};
+    Object.keys(saved).forEach((k) => (chosen[k] = saved[k]));
+
+    const head = document.createElement('div');
+    head.className = 'quiz-head';
+    head.innerHTML = `
+      <div>
+        <h3>${spec.title || 'Check yourself'}</h3>
+        <p class="muted">${spec.intro || 'Three questions about what you just watched happen. ' +
+          'Getting one wrong is more useful than getting it right — the explanation is the point.'}</p>
+      </div>
+      <div class="quiz-score"><span id="${spec.id}-score">0</span> / ${spec.questions.length}</div>`;
+    container.appendChild(head);
+    const scoreEl = head.querySelector('.quiz-score span');
+
+    const cards = spec.questions.map((question, qi) => {
+      const card = document.createElement('div');
+      card.className = 'quiz-q';
+      card.innerHTML = `
+        <div class="quiz-num">Question ${qi + 1}</div>
+        <div class="quiz-text">${question.q}</div>
+        <div class="quiz-options"></div>
+        <div class="quiz-why" hidden></div>`;
+      const opts = card.querySelector('.quiz-options');
+      const why = card.querySelector('.quiz-why');
+
+      question.options.forEach((text, oi) => {
+        const b = document.createElement('button');
+        b.className = 'quiz-opt';
+        b.innerHTML = `<i>${'ABCD'[oi]}</i><span>${text}</span>`;
+        b.addEventListener('click', () => answer(qi, oi));
+        opts.appendChild(b);
+      });
+      container.appendChild(card);
+      return { card, opts, why, question };
+    });
+
+    function render() {
+      let correct = 0;
+      cards.forEach(({ opts, why, question }, qi) => {
+        const pick = chosen[qi];
+        const answered = pick !== undefined;
+        [...opts.children].forEach((b, oi) => {
+          b.classList.toggle('correct', answered && oi === question.answer);
+          b.classList.toggle('wrong', answered && oi === pick && pick !== question.answer);
+          b.disabled = answered;
+        });
+        why.hidden = !answered;
+        if (answered) {
+          const right = pick === question.answer;
+          if (right) correct++;
+          why.className = 'quiz-why ' + (right ? 'right' : 'nope');
+          why.innerHTML = `<b>${right ? 'Correct.' : 'Not quite — ' +
+            'the answer is ' + 'ABCD'[question.answer] + '.'}</b> ${question.why}`;
+        }
+      });
+      scoreEl.textContent = String(correct);
+      const done = Object.keys(chosen).length === spec.questions.length;
+      footer.hidden = !done;
+      if (done) {
+        footerText.innerHTML = correct === spec.questions.length
+          ? '<b>All three.</b> You can explain this lesson to someone else now, which is the real test.'
+          : `<b>${correct} of ${spec.questions.length}.</b> Re-read the explanations above, then reset and try again — ` +
+            'the ones you got wrong are the ones worth going back to the sandbox for.';
+        if (correct === spec.questions.length && spec.badge) {
+          achieve(spec.badge, `You answered every question in ${spec.title || 'the quiz'}`);
+        }
+      }
+    }
+
+    function answer(qi, oi) {
+      if (chosen[qi] !== undefined) return;
+      chosen[qi] = oi;
+      const state = quizState();
+      state[spec.id] = chosen;
+      saveQuizState(state);
+      render();
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'quiz-footer';
+    footer.hidden = true;
+    footer.innerHTML = '<span></span><button class="small">Reset these questions</button>';
+    const footerText = footer.querySelector('span');
+    footer.querySelector('button').addEventListener('click', () => {
+      Object.keys(chosen).forEach((k) => delete chosen[k]);
+      const state = quizState();
+      delete state[spec.id];
+      saveQuizState(state);
+      render();
+    });
+    container.appendChild(footer);
+
+    render();
   }
 
   /* ------------------------- controls ------------------------- */
@@ -321,6 +506,6 @@
     };
   }
 
-  return { LESSONS, BADGES, chrome, nextLinks, achieve, badgesEarned,
-           slider, pills, checkbox, statGrid, rafLoop, pointerPos };
+  return { LESSONS, BADGES, chrome, nextLinks, achieve, badgesEarned, onBadge,
+           quiz, goalPanel, slider, pills, checkbox, statGrid, rafLoop, pointerPos };
 });

@@ -310,6 +310,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     chrome('rocket', '../');
+    window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.rocket);
+    window.ML.goalPanel(document.getElementById('lesson-goals'), 'rocket');
     nextLinks(document.getElementById('next-links'), 'racer', null, '../');
 
     /* --- shared reward weights, edited by the user, used everywhere --- */

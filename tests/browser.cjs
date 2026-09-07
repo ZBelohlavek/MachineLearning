@@ -230,6 +230,87 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- quizzes ---- */
+  {
+    const page = await open('lessons/gridworld.html');
+    await scrollTo(page, '#quiz');
+    const result = await page.evaluate(() => {
+      const spec = window.ML.QUIZZES.gridworld;
+      const cards = [...document.querySelectorAll('#quiz .quiz-q')];
+      cards.forEach((c, i) => c.querySelectorAll('.quiz-opt')[spec.questions[i].answer].click());
+      return { score: document.querySelector('.quiz-score span').textContent,
+               explained: document.querySelectorAll('#quiz .quiz-why.right').length };
+    });
+    check('quiz · three questions, all explained', result.score === '3' && result.explained === 3,
+          `(scored ${result.score})`);
+    await page.reload();
+    await page.waitForTimeout(1200);
+    const kept = await page.evaluate(() => document.querySelector('.quiz-score span').textContent);
+    check('quiz · answers persist across a reload', kept === '3');
+    await page.close();
+  }
+
+  /* ---- in-lesson goals ---- */
+  {
+    const page = await open('lessons/convolutions.html');
+    // badges persist across pages in one browser context, so start this one clean
+    await page.evaluate(() => localStorage.setItem('mlbb-badges', '{}'));
+    await page.reload();
+    await page.waitForTimeout(1200);
+    const start = await page.evaluate(() => document.querySelector('#lesson-goals .goals-head span').textContent);
+    await scrollTo(page, '#kernel-editor');
+    await page.fill('#kernel-editor input:first-child', '3');
+    await page.waitForTimeout(500);
+    const after = await page.evaluate(() => document.querySelector('#lesson-goals .goals-head span').textContent);
+    check('goals · the in-lesson panel updates live', start !== after, `(${start.trim()} → ${after.trim()})`);
+    await page.close();
+  }
+
+  /* ---- the auto-graded kernel challenge ---- */
+  {
+    const page = await open('lessons/convolutions.html');
+    await page.evaluate(() => localStorage.setItem('mlbb-badges', '{}'));
+    await page.reload();
+    await page.waitForTimeout(1200);
+    await scrollTo(page, '#kernel-presets');
+    await page.click('#kernel-presets .pill:text-is("Sobel Y (horizontal edges)")');
+    await page.waitForTimeout(400);
+    const presetAwarded = await page.evaluate(() =>
+      !!JSON.parse(localStorage.getItem('mlbb-badges') || '{}')['conv-challenge']);
+    check('challenge · clicking the preset does not pass it', !presetAwarded);
+    const vals = ['-1', '-2', '-1', '0', '0', '0', '1', '2', '1'];
+    const inputs = await page.$$('#kernel-editor input');
+    for (let i = 0; i < inputs.length; i++) { await inputs[i].fill(vals[i]); await page.waitForTimeout(50); }
+    await page.waitForTimeout(500);
+    const typedAwarded = await page.evaluate(() =>
+      !!JSON.parse(localStorage.getItem('mlbb-badges') || '{}')['conv-challenge']);
+    check('challenge · a hand-typed edge detector passes it', typedAwarded);
+    await page.close();
+  }
+
+  /* ---- the racer copes with a broken track ---- */
+  {
+    const page = await open('lessons/evolve-a-driver.html');
+    await scrollTo(page, '#track-canvas');
+    await page.click('#btn-run');
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => {
+      const t = window.__racer.track;
+      for (let dy = -10; dy <= 10; dy++) for (let dx = -10; dx <= 10; dx++) {
+        const x = (t.start.x + dx) | 0, y = (t.start.y + dy) | 0;
+        if (x >= 0 && y >= 0 && x < 240 && y < 150) t.mask[y * 240 + x] = 0;
+      }
+      t.computeDistance();
+    });
+    await page.waitForTimeout(800);
+    const warned = await page.evaluate(() => !document.querySelector('#track-warning').hidden);
+    const g1 = await page.evaluate(() => document.querySelector('#racer-stats .stat .v').textContent);
+    await page.waitForTimeout(1200);
+    const g2 = await page.evaluate(() => document.querySelector('#racer-stats .stat .v').textContent);
+    check('racer · erasing the start warns instead of churning generations', warned && g1 === g2);
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();
