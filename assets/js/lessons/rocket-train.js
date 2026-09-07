@@ -51,7 +51,8 @@
       this.hp = { ...DEFAULT_HP, ...(opts.hp || {}) };
       this.rewards = { ...DEFAULT_REWARDS, ...(opts.rewards || {}) };
       this.opponent = opts.opponent || 'self';   // 'self' | 'past' | 'scripted' | 'none'
-      this.rand = mulberry32(opts.seed ?? 20240115);
+      this.seed = opts.seed ?? 20240115;
+      this.rand = mulberry32(this.seed);
       this.pbuf = new Float32Array(ACTIONS.length);
       this.dLogits = new Float32Array(ACTIONS.length);
       this.buildNets();
@@ -63,14 +64,22 @@
       const h = this.hp.hidden;
       // outScale keeps initial logits near zero => a near-uniform starting policy.
       // The agent begins genuinely undecided rather than stuck on one action.
+      // The same seed drives initialisation, action sampling and minibatch
+      // shuffling, so two runs differ only by what you changed between them.
       this.policy = new MLP([OBS_SIZE, h, h, ACTIONS.length],
-        { hidden: 'tanh', out: 'linear', outScale: 0.05 });
-      this.value = new MLP([OBS_SIZE, 48, 48, 1], { hidden: 'tanh', out: 'linear' });
+        { hidden: 'tanh', out: 'linear', outScale: 0.05, rand: this.rand });
+      this.value = new MLP([OBS_SIZE, 48, 48, 1], { hidden: 'tanh', out: 'linear', rand: this.rand });
       this.frozen = MLP.fromJSON(this.policy.toJSON());
     }
 
     reset(hard = true) {
-      if (hard) this.buildNets();
+      if (hard) {
+        this.rand = mulberry32(this.seed);
+        this.buildNets();
+        // The arena draws its own kickoffs; without re-seeding it, two runs on
+        // the same seed still start from different positions.
+        if (this.arena) this.arena.rand = mulberry32(this.seed + 12345);
+      }
       this.episodes = 0;
       this.updates = 0;
       this.steps = 0;
@@ -87,6 +96,8 @@
     }
 
     setRewards(r) { this.rewards = { ...r }; this.arena.rewards = this.rewards; }
+
+    setSeed(seed) { this.seed = seed; this.reset(true); }
 
     act(obs, greedy = false, net = this.policy) {
       const probs = softmaxInto(net.forward(obs), this.pbuf);

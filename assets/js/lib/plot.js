@@ -64,9 +64,36 @@
         dashed: !!s.dashed, data: [],
       }));
       this.xs = [];
+      this.ghosts = null;          // a pinned previous run, drawn behind the live one
+      this.ghostXs = null;
+      this.hover = null;           // {x, y} in css pixels, while the pointer is over the plot
       this.resize();
       window.addEventListener('resize', () => { this.resize(); this.draw(); });
+
+      // Hovering reads values off the curve. Charts here are cheap to redraw,
+      // so the crosshair simply triggers a normal redraw.
+      const move = (ev) => {
+        const r = this.canvas.getBoundingClientRect();
+        const p = ev.touches ? ev.touches[0] : ev;
+        this.hover = { x: ((p.clientX - r.left) / r.width) * this.ctx._cssW,
+                       y: ((p.clientY - r.top) / r.height) * this.ctx._cssH };
+        this.draw();
+      };
+      this.canvas.addEventListener('pointermove', move);
+      this.canvas.addEventListener('pointerleave', () => { this.hover = null; this.draw(); });
     }
+
+    /** Freeze the current curves as a faint ghost, to compare the next run against. */
+    pin() {
+      if (!this.xs.length) return false;
+      this.ghostXs = this.xs.slice();
+      this.ghosts = this.series.map((s) => ({ colour: s.color, name: s.name, data: s.data.slice() }));
+      this.draw();
+      return true;
+    }
+
+    unpin() { this.ghosts = null; this.ghostXs = null; this.draw(); }
+    get pinned() { return !!this.ghosts; }
 
     resize() {
       this.ctx = fit(this.canvas, this.opts.height || 180);
@@ -99,7 +126,8 @@
       // --- y range ---
       let lo = this.opts.yMin ?? Infinity, hi = this.opts.yMax ?? -Infinity;
       if (this.opts.yMin == null || this.opts.yMax == null) {
-        for (const s of this.series) {
+        const sets = this.ghosts ? this.series.concat(this.ghosts) : this.series;
+        for (const s of sets) {
           for (const v of s.data) {
             if (v == null || !isFinite(v)) continue;
             if (this.opts.yMin == null && v < lo) lo = v;
@@ -112,7 +140,11 @@
       const padY = (hi - lo) * 0.08; lo -= padY; hi += padY;
 
       const n = this.xs.length;
-      const x0 = this.xs[0] ?? 0, x1 = this.xs[n - 1] ?? 1;
+      let x0 = this.xs[0] ?? 0, x1 = this.xs[n - 1] ?? 1;
+      if (this.ghostXs && this.ghostXs.length) {
+        x0 = Math.min(x0, this.ghostXs[0]);
+        x1 = Math.max(x1, this.ghostXs[this.ghostXs.length - 1]);
+      }
       const spanX = Math.max(1e-9, x1 - x0);
       const px = (x) => P.l + ((x - x0) / spanX) * plotW;
       const py = (y) => P.t + (1 - (y - lo) / (hi - lo)) * plotH;
@@ -164,6 +196,26 @@
       // --- series ---
       ctx.save();
       ctx.beginPath(); ctx.rect(P.l, P.t, plotW, plotH); ctx.clip();
+
+      if (this.ghosts) {
+        ctx.setLineDash([5, 4]);
+        ctx.lineWidth = 1.5;
+        for (const g of this.ghosts) {
+          ctx.strokeStyle = g.colour;
+          ctx.globalAlpha = 0.38;
+          ctx.beginPath();
+          let started = false;
+          for (let i = 0; i < this.ghostXs.length; i++) {
+            const v = g.data[i];
+            if (v == null || !isFinite(v)) { started = false; continue; }
+            const X = px(this.ghostXs[i]), Y = py(v);
+            if (!started) { ctx.moveTo(X, Y); started = true; } else ctx.lineTo(X, Y);
+          }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.setLineDash([]);
+      }
       for (const s of this.series) {
         ctx.strokeStyle = s.color; ctx.lineWidth = s.width;
         ctx.setLineDash(s.dashed ? [4, 4] : []);
@@ -180,6 +232,69 @@
       }
       ctx.setLineDash([]);
       ctx.restore();
+
+      // --- hover readout ---
+      if (this.hover && n > 1 &&
+          this.hover.x >= P.l && this.hover.x <= W - P.r &&
+          this.hover.y >= P.t && this.hover.y <= H - P.b) {
+        const targetX = x0 + ((this.hover.x - P.l) / plotW) * spanX;
+        let bi = 0, bd = Infinity;
+        for (let i = 0; i < n; i++) {
+          const d = Math.abs(this.xs[i] - targetX);
+          if (d < bd) { bd = d; bi = i; }
+        }
+        const hx = px(this.xs[bi]);
+        ctx.strokeStyle = 'rgba(255,255,255,.25)';
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(hx, P.t); ctx.lineTo(hx, H - P.b); ctx.stroke();
+        ctx.setLineDash([]);
+
+        const lines = [];
+        for (const s of this.series) {
+          const v = s.data[bi];
+          if (v == null || !isFinite(v)) continue;
+          ctx.fillStyle = s.color;
+          ctx.beginPath(); ctx.arc(hx, py(v), 3.5, 0, Math.PI * 2); ctx.fill();
+          lines.push({ colour: s.color, text: `${s.name || 'value'} ${fmt(v)}` });
+        }
+        if (this.ghosts) {
+          for (const g of this.ghosts) {
+            let gi = 0, gd = Infinity;
+            for (let i = 0; i < this.ghostXs.length; i++) {
+              const d = Math.abs(this.ghostXs[i] - this.xs[bi]);
+              if (d < gd) { gd = d; gi = i; }
+            }
+            const v = g.data[gi];
+            if (v == null || !isFinite(v)) continue;
+            lines.push({ colour: g.colour, text: `pinned ${g.name || ''} ${fmt(v)}`.trim(), faint: true });
+          }
+        }
+
+        ctx.font = '11px ui-monospace, monospace';
+        const boxW = Math.max(78, ...lines.map((l) => ctx.measureText(l.text).width + 20));
+        const boxH = 15 * lines.length + 20;
+        let bx = hx + 10;
+        if (bx + boxW > W - P.r) bx = hx - boxW - 10;
+        const by = Math.min(Math.max(P.t + 2, this.hover.y - boxH / 2), H - P.b - boxH - 2);
+        ctx.fillStyle = 'rgba(10,15,25,.94)';
+        ctx.strokeStyle = '#26314a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.rect(bx, by, boxW, boxH);
+        ctx.fill(); ctx.stroke();
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillStyle = '#6d7f9c';
+        ctx.fillText(`${this.opts.xLabel || 'x'} ${fmt(this.xs[bi])}`, bx + 8, by + 5);
+        lines.forEach((l, i) => {
+          ctx.fillStyle = l.colour;
+          ctx.globalAlpha = l.faint ? 0.6 : 1;
+          ctx.fillRect(bx + 8, by + 24 + i * 15, 7, 3);
+          ctx.fillStyle = l.faint ? '#8494ad' : '#cfe0ff';
+          ctx.fillText(l.text, bx + 20, by + 19 + i * 15);
+          ctx.globalAlpha = 1;
+        });
+      }
 
       // --- legend ---
       if (this.series.some((s) => s.name)) {

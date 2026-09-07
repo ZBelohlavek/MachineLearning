@@ -325,6 +325,15 @@ button.danger { color: #ffc9c9; border-color: rgba(255,107,107,.4); background: 
 button.small { padding: 5px 10px; font-size: .8rem; }
 button.toggle.on { border-color: var(--good); color: #b6f4dd; background: rgba(56,211,159,.12); }
 
+.run-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg-soft); border: 1px solid var(--line-soft);
+  border-radius: 10px; padding: 9px 12px; margin: 12px 0;
+}
+.run-seed { display: flex; align-items: center; gap: 7px; font-size: .82rem; color: var(--text-dim); }
+.run-seed input { width: 82px; padding: 5px 8px; font-family: var(--mono); font-size: .82rem; }
+.run-note { font-size: .78rem; flex: 1; min-width: 150px; }
+
 .field { margin: 12px 0; }
 .field label.row {
   display: flex; justify-content: space-between; align-items: baseline;

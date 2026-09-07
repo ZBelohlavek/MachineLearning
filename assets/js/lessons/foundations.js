@@ -11,10 +11,8 @@
   const { MLP, mulberry32, randn, clamp, hidpi, fit, LineChart, achieve, heat,
           chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop } = window.ML;
 
-  const rand = mulberry32(3);
-
   /* ------------------------------------------------------------ datasets */
-  function makeData(kind, n, noise) {
+  function makeData(kind, n, noise, rand) {
     const pts = [];
     const add = (x, y, l) => pts.push({ x: clamp(x, -1.15, 1.15), y: clamp(y, -1.15, 1.15), label: l });
     const jit = () => randn(rand) * noise;
@@ -70,6 +68,10 @@
 
     /* ---------------- state ---------------- */
     let dataset = 'moons', noise = 0.12, nPoints = 180;
+    // One seed drives the dataset, the train/test split and the initial weights,
+    // so two runs with the same seed differ only by what you changed.
+    let seed = 1234;
+    let rand = mulberry32(seed);
     let all = [], train = [], test = [];
     let hidden = [6, 6], activation = 'tanh';
     let lr = 0.03, weightDecay = 0, batchSize = 16;
@@ -102,7 +104,8 @@
 
     /* ---------------- data + model plumbing ---------------- */
     function regenerate() {
-      all = makeData(dataset, nPoints, noise);
+      rand = mulberry32(seed);
+      all = makeData(dataset, nPoints, noise, rand);
       splitData();
       rebuild();
     }
@@ -127,7 +130,7 @@
       minTestLoss = Infinity; trainLossAtMin = Infinity;
       landTrail = []; landDirs = null;
       const sizes = [2, ...hidden.filter((h) => h > 0), 1];
-      net = new MLP(sizes, { hidden: activation, out: 'linear', rand: mulberry32((Math.random() * 1e9) | 0) });
+      net = new MLP(sizes, { hidden: activation, out: 'linear', rand: mulberry32(seed + 7919) });
       epoch = 0;
       chart.clear();
       buildNeuronPanels();
@@ -552,6 +555,13 @@
       desc: 'Pulls weights toward zero, which smooths the boundary. The simplest cure for overfitting.',
     });
 
+    const runControls = window.ML.runBar(document.getElementById('run-bar'), {
+      seed,
+      charts: () => [chart],
+      onSeed: (v) => { seed = v; regenerate(); },
+      note: 'Same seed, same points and same starting weights.',
+    });
+
     const btnRun = document.getElementById('btn-run');
     btnRun.addEventListener('click', () => {
       running = !running;
@@ -563,7 +573,9 @@
       const m = report();
       chart.push(epoch, [m.tr.loss, m.te.loss]); chart.draw();
     });
-    document.getElementById('btn-reinit').addEventListener('click', () => rebuild());
+    document.getElementById('btn-reinit').addEventListener('click', () => {
+      runControls.set(Math.floor(Math.random() * 100000));    // a new seed is a new init
+    });
     document.getElementById('btn-regen').addEventListener('click', () => regenerate());
 
     /* ---------------- loop ---------------- */

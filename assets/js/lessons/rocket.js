@@ -608,6 +608,19 @@
       ],
     });
 
+    const runControls = window.ML.runBar(document.getElementById('run-bar'), {
+      seed: trainer.seed,
+      charts: () => [chartReward, chartSkill, chartLearn],
+      onSeed: (v) => {
+        trainer.setSeed(v);
+        trainer.fromCheckpoint = false;
+        chartReward.clear(); chartSkill.clear(); chartLearn.clear();
+        match.score = [0, 0];
+        refreshStats();
+      },
+      note: 'Same seed, same starting policy and the same kickoffs.',
+    });
+
     let training = false, budget = 14, epsAtLastSecond = 0, lastSecond = performance.now();
     const btnTrain = document.getElementById('btn-train');
     const btnReset = document.getElementById('btn-reset');

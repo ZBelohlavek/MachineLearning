@@ -28,6 +28,7 @@
     let f1 = 8, f2 = 16, hiddenUnits = 32;
     let lr = 0.004, batchSize = 16, aug = 1;
     let net, epoch = 0, seen = 0, running = false, pretrained = false, fromScratch = true;
+    let seed = 1234;
 
     function updateBanner() {
       const el = document.getElementById('model-banner');
@@ -43,10 +44,13 @@
       el.className = pretrained ? 'note good' : 'note warn';
     }
     let trainSet, testSet;
-    const rng = mulberry32(1234);
+    let rng = mulberry32(seed);
 
     /* ------------------------- model ------------------------- */
     function build() {
+      // Re-seeded here rather than at the call site, so every path that rebuilds
+      // the network (a slider, a reset, a new seed) starts from the same weights.
+      rng = mulberry32(seed + 7919);
       const l = [];
       let shape = [1, S, S];
       const c1 = new Conv2D(shape, f1, 3, rng); l.push(c1);
@@ -82,8 +86,9 @@
     }
 
     function regenerateData() {
-      trainSet = makeDigitSet(1000, rng, aug, S);
-      testSet = makeDigitSet(300, mulberry32(999), aug, S);
+      const dataRng = mulberry32(seed);            // data has its own stream
+      trainSet = makeDigitSet(1000, dataRng, aug, S);
+      testSet = makeDigitSet(300, mulberry32(seed + 999), aug, S);
       drawSamples();
     }
 
@@ -498,6 +503,21 @@
     });
     const setStat = statGrid(document.getElementById('cnn-stats'),
       ['epoch', 'images seen', 'train acc', 'test acc', 'loss', 'parameters']);
+
+    const runControls = window.ML.runBar(document.getElementById('run-bar'), {
+      seed,
+      charts: () => [chart],
+      onSeed: (v) => {
+        seed = v;
+        const keep = window.ML_CNN_MODEL;
+        window.ML_CNN_MODEL = null;          // a chosen seed means training it yourself
+        build();
+        window.ML_CNN_MODEL = keep;
+        epoch = 0; seen = 0;
+        regenerateData(); shuffleOrder(); buildFeatureTiles(); predictPad();
+      },
+      note: 'Same seed, same digits and same starting weights.',
+    });
 
     const btnTrain = document.getElementById('btn-train');
     btnTrain.addEventListener('click', () => {

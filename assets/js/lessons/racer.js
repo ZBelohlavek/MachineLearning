@@ -196,7 +196,8 @@
     window.ML.goalPanel(document.getElementById('lesson-goals'), 'racer');
     nextLinks(document.getElementById('next-links'), 'gridworld', 'rocket', '../');
 
-    const rand = mulberry32(20240607);
+    let seed = 20240607;
+    let rand = mulberry32(seed);
     const track = new Track();
     window.__racer = { track };            // handy from the console, and used by the tests
 
@@ -556,6 +557,13 @@
       setStat('champion time', championTime === null ? '–' : championTime.toFixed(2) + 's');
       setStat('brain size', cars[0] ? cars[0].brain.numParams() + ' weights' : '–');
     }
+
+    window.ML.runBar(document.getElementById('run-bar'), {
+      seed,
+      charts: () => [chart],
+      onSeed: (v) => { seed = v; rand = mulberry32(seed); newPopulation(); updateStats(0, 0, 0); },
+      note: 'Same seed, same starting population — so a settings change is the only difference.',
+    });
 
     const btnRun = document.getElementById('btn-run');
     let running = false;

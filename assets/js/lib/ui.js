@@ -396,6 +396,65 @@
     render();
   }
 
+  /**
+   * Run controls: a seed and a pin.
+   *
+   * Every lesson invites you to change one setting and see what happens, which
+   * is only an experiment if everything else is held constant and you can see
+   * the before and after together. The seed fixes the random draw; the pin
+   * freezes the current curves as a ghost for the next run to be measured
+   * against.
+   *
+   * runBar(parent, { seed, onSeed, charts, note })
+   */
+  function runBar(parent, opts = {}) {
+    if (!parent) return null;
+    let seed = opts.seed ?? 1234;
+    const wrap = document.createElement('div');
+    wrap.className = 'run-bar';
+    wrap.innerHTML = `
+      <label class="run-seed">
+        <span>seed</span>
+        <input type="number" min="0" max="999999" step="1" value="${seed}">
+      </label>
+      <button class="small" data-role="dice" title="Random seed">🎲</button>
+      <button class="small" data-role="pin">Pin this run</button>
+      <span class="run-note muted"></span>`;
+    parent.appendChild(wrap);
+
+    const input = wrap.querySelector('input');
+    const pinBtn = wrap.querySelector('[data-role=pin]');
+    const note = wrap.querySelector('.run-note');
+    const charts = () => (typeof opts.charts === 'function' ? opts.charts() : (opts.charts || []));
+
+    const apply = (v) => {
+      seed = Math.max(0, Math.round(v) || 0);
+      input.value = String(seed);
+      if (opts.onSeed) opts.onSeed(seed);
+    };
+    input.addEventListener('change', () => apply(parseInt(input.value, 10)));
+    wrap.querySelector('[data-role=dice]').addEventListener('click',
+      () => apply(Math.floor(Math.random() * 100000)));
+
+    const refresh = () => {
+      const anyPinned = charts().some((c) => c && c.pinned);
+      pinBtn.textContent = anyPinned ? 'Clear pinned run' : 'Pin this run';
+      pinBtn.classList.toggle('toggle', anyPinned);
+      pinBtn.classList.toggle('on', anyPinned);
+      note.textContent = anyPinned
+        ? 'The dashed curves are the pinned run — change one setting and compare.'
+        : (opts.note || 'Same seed, same data and same starting weights.');
+    };
+    pinBtn.addEventListener('click', () => {
+      const cs = charts().filter(Boolean);
+      const anyPinned = cs.some((c) => c.pinned);
+      cs.forEach((c) => (anyPinned ? c.unpin() : c.pin()));
+      refresh();
+    });
+    refresh();
+    return { get seed() { return seed; }, set: apply, refresh };
+  }
+
   /* ------------------------- controls ------------------------- */
 
   /**
@@ -568,5 +627,6 @@
   }
 
   return { LESSONS, BADGES, chrome, nextLinks, achieve, badgesEarned, onBadge,
-           quiz, goalPanel, dpad, slider, pills, checkbox, statGrid, rafLoop, pointerPos };
+           quiz, goalPanel, dpad, runBar, slider, pills, checkbox, statGrid,
+           rafLoop, pointerPos };
 });

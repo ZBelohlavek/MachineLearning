@@ -37,10 +37,12 @@
     let current = null;               // the image currently being inspected
     let selected = 0;                 // which patch is the query
     let attnMode = 'cls';
-    const rng = mulberry32(4242);
+    let seed = 4242;
+    let rng = mulberry32(seed);
 
     /* ---------------------------------------------------------- model */
     function build() {
+      rng = mulberry32(seed + 7919);
       net = new ViT({ imgSize: S, patch, dim, mlpHidden: dim * 2, classes: 10, rand: rng, useCLS, useNorm });
       window.__vit = net;                      // used by tools/train-vision.cjs
       net.arch = { patch, dim, useCLS, useNorm };
@@ -65,8 +67,9 @@
     }
 
     function regenerateData() {
-      trainSet = makeDigitSet(trainSize, rng, aug, S);
-      testSet = makeDigitSet(300, mulberry32(31337), aug, S);
+      const dataRng = mulberry32(seed);
+      trainSet = makeDigitSet(trainSize, dataRng, aug, S);
+      testSet = makeDigitSet(300, mulberry32(seed + 31337), aug, S);
       shuffleOrder();
     }
 
@@ -416,6 +419,22 @@
       desc: 'Press "New data" after changing this. A transformer has fewer built-in assumptions than a CNN, so it leans harder on examples — this slider is the cheapest way to see that.',
     });
 
+    const runControls = window.ML.runBar(document.getElementById('run-bar'), {
+      seed,
+      charts: () => [chart],
+      onSeed: (v) => {
+        seed = v;
+        const keep = window.ML_VIT_MODEL;
+        window.ML_VIT_MODEL = null;
+        build();
+        window.ML_VIT_MODEL = keep;
+        seen = 0; epoch = 0;
+        regenerateData();
+        refreshAll();
+      },
+      note: 'Same seed, same digits and same starting weights.',
+    });
+
     const btnTrain = document.getElementById('btn-train');
     btnTrain.addEventListener('click', () => {
       running = !running;
@@ -434,7 +453,7 @@
     document.getElementById('btn-regen').addEventListener('click', () => { regenerateData(); });
 
     /* ---------------------------------------------------- main loop */
-    let evalCountdown = 0;
+    let evalCountdown = 0, frame = 0;
     rafLoop(() => {
       if (!running) return;
       const t0 = performance.now();
@@ -461,7 +480,9 @@
         } else chart.push(seen, [acc, null]);
         chart.draw();
       }
-      refreshAll();
+      // A full refresh means a forward pass plus recomputing every attention and
+      // position tile. Ten times a second looks identical and trains faster.
+      if (frame++ % 6 === 0) refreshAll();
     }).start();
 
     /* ---------------------------------------------------- go */
