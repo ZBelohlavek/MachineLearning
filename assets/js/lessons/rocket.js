@@ -280,14 +280,28 @@
     w: 'up', s: 'down', a: 'left', d: 'right',
     W: 'up', S: 'down', A: 'left', D: 'right',
   };
-  function bindKeys(target) {
+  /**
+   * Arrow keys drive a car only while that car's arena is on screen AND a human
+   * is actually driving it. Without both conditions the page steals the arrow
+   * keys from the browser and you cannot scroll the lesson.
+   */
+  function bindKeys(match, canvas, wantsHuman) {
+    let visible = false;
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((entries) => { visible = entries[0].isIntersecting; },
+        { threshold: 0.25 }).observe(canvas);
+    } else visible = true;
+
     const on = (e, down) => {
       const k = KEYMAP[e.key];
       if (!k) return;
-      if (target.active) { e.preventDefault(); target.keys[k] = down; }
+      if (!visible || !wantsHuman()) return;
+      e.preventDefault();
+      match.keys[k] = down;
     };
     window.addEventListener('keydown', (e) => on(e, true));
     window.addEventListener('keyup', (e) => on(e, false));
+    window.addEventListener('blur', () => { match.keys = {}; });
   }
 
   /* ======================================================================
@@ -309,9 +323,8 @@
     const sandbox = new Match(document.getElementById('sandbox-canvas'), {
       mode: 'human-solo', rewards,
     });
-    sandbox.active = true;
     sandbox.spreadOverride = 1;
-    bindKeys(sandbox);
+    bindKeys(sandbox, sandbox.canvas, () => sandbox.mode === 'human-solo' || sandbox.mode === 'human');
 
     const obsCanvas = document.getElementById('obs-canvas');
     const obsCtx = fit(obsCanvas, 132);
@@ -458,7 +471,6 @@
       const stageMatch = new Match(document.getElementById('stage-canvas'), {
         trainer: stageAgent, mode: 'selfplay', rewards,
       });
-      stageMatch.active = true;
       stageMatch.greedy = false;
 
       // Two charts rather than one: a rate between 0 and 1 and a count that
@@ -559,8 +571,7 @@
        PANEL 3 — training
        ================================================================== */
     const match = new Match(document.getElementById('train-canvas'), { rewards, trainer, mode: 'selfplay' });
-    match.active = true;
-    bindKeys(match);
+    bindKeys(match, match.canvas, () => match.mode === 'human');
 
     match.onGoal = (team, mode) => {
       if (mode === 'human' && team === 1) {

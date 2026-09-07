@@ -118,6 +118,27 @@ nav.site-nav a {
 nav.site-nav a:hover { background: var(--panel); color: var(--text); text-decoration: none; }
 nav.site-nav a.active { background: var(--panel-2); color: var(--text); }
 
+@media (max-width: 940px) {
+  header.site .wrap {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding-top: 10px;
+    padding-bottom: 8px;
+  }
+  /* one swipeable row rather than three wrapped ones */
+  nav.site-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -22px;
+    padding: 0 22px 2px;
+  }
+  nav.site-nav::-webkit-scrollbar { display: none; }
+  nav.site-nav a { white-space: nowrap; flex: none; }
+}
+
 footer.site {
   margin-top: 80px;
   border-top: 1px solid var(--line-soft);
@@ -235,7 +256,10 @@ footer.site {
 
 /* ---------- controls ---------- */
 
-canvas { display: block; max-width: 100%; touch-action: none; }
+canvas { display: block; max-width: 100%; }
+/* Only canvases you draw or drag on swallow touch gestures. Everything else —
+   charts, feature maps, arenas — must let a finger scroll the page past it. */
+#data-canvas, #grid-canvas, #conv-in, #pad, #vit-pad, #track-canvas { touch-action: none; }
 canvas.fit { width: 100%; }
 canvas.stage {
   background: #0a0f19;
