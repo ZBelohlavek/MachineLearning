@@ -379,6 +379,48 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- the language model ---- */
+  {
+    const page = await open('lessons/language.html');
+    const before = await page.textContent('#sample-out');
+    await scrollTo(page, '#sample-out');
+    await page.click('#btn-train');
+    await page.waitForTimeout(16000);
+    await page.click('#btn-train');
+    const stats = await page.$$eval('#lm-stats .stat',
+      els => Object.fromEntries(els.map(e => [e.querySelector('.k').textContent, e.querySelector('.v').textContent.trim()])));
+    const after = await page.textContent('#sample-out');
+    const loss = parseFloat(stats.loss);
+    check('language · loss falls well below its starting point', loss < 1.2, `(loss ${stats.loss})`);
+    // real words from the corpus should appear once it has learned anything
+    const words = ['the', 'boats', 'harbour', 'water', 'and'];
+    const hits = words.filter((w) => after.includes(w)).length;
+    check('language · samples contain real words after training', hits >= 3 && after !== before,
+          `(${hits}/5 corpus words present)`);
+    const attnOk = await page.evaluate(() => {
+      const net = window.__charlm, T = net.T, A = net.attn.head(0);
+      let leak = 0;
+      for (let t = 0; t < T; t++) for (let u = t + 1; u < T; u++) leak += A[t * T + u];
+      return leak === 0;
+    });
+    check('language · attention never looks at the future', attnOk);
+    await page.close();
+  }
+
+  /* ---- the training worker, where the browser allows one ---- */
+  {
+    const page = await open('lessons/rocket-league.html');
+    const note = await page.textContent('#thread-note');
+    // over file:// there is no worker; the page must say so and still train
+    check('rocket · says which thread training is on', /thread/.test(note), `→ "${note.trim().slice(0, 48)}…"`);
+    await page.click('#btn-train');
+    await page.waitForTimeout(6000);
+    await page.click('#btn-train');
+    const eps = await page.evaluate(() => window.__trainer.episodes);
+    check('rocket · trains either way', eps > 20, `(${eps} episodes)`);
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();

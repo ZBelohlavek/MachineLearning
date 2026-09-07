@@ -549,7 +549,11 @@
     const setStat = statGrid(document.getElementById('racer-stats'),
       ['generation', 'best', 'average', 'finished', 'champion time', 'brain size']);
 
+    const say = window.ML.announcer();
+
     function updateStats(bestProgress, meanProgress, finishers) {
+      say(`Generation ${generation}. Best car reached ${(bestProgress * 100).toFixed(0)} percent ` +
+          `of the course, ${finishers} of ${popSize} finished.`);
       setStat('generation', generation);
       setStat('best', (bestProgress * 100).toFixed(0) + '%', bestProgress > 0.99 ? 'good' : '');
       setStat('average', (meanProgress * 100).toFixed(0) + '%');

@@ -103,6 +103,30 @@
       ctx.strokeRect(ox + 2 * cell + 1, oy + 2 * cell + 1, cell - 2, cell - 2);
     },
 
+    /* text turning into a probability distribution over the next character */
+    language(ctx, W, H) {
+      ctx.fillStyle = '#0a0f19';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = '11px ui-monospace, monospace';
+      ctx.textBaseline = 'middle';
+      const line = 'the harbour wakes early. the boats go';
+      ctx.fillStyle = '#6d7f9c';
+      ctx.fillText(line.slice(0, 28), 12, H * 0.28);
+      ctx.fillStyle = '#e6ecf7';
+      ctx.fillText(line.slice(28, 36), 12 + ctx.measureText(line.slice(0, 28)).width, H * 0.28);
+      // a small distribution over the next character
+      const bars = [['o', .52], ['e', .21], ['a', .12], ['i', .08], ['u', .04]];
+      bars.forEach(([ch, p], i) => {
+        const y = H * 0.45 + i * 11;
+        ctx.fillStyle = '#9fb0cc';
+        ctx.fillText(ch, 14, y);
+        ctx.fillStyle = 'rgba(124,92,255,.30)';
+        ctx.fillRect(26, y - 4, (W - 46), 8);
+        ctx.fillStyle = '#7c5cff';
+        ctx.fillRect(26, y - 4, (W - 46) * p, 8);
+      });
+    },
+
     /* q-values and a policy arrow per cell */
     gridworld(ctx, W, H) {
       const NX = 7, NY = 4, cell = Math.min(W / NX, H / NY);
@@ -213,11 +237,46 @@
             : nEarned === BADGES.length ? 'Every badge earned. Genuinely well done.'
             : 'Kept in this browser only.'}
         </span>
+        <button class="small" id="export-progress">Export</button>
+        <label class="btn small" style="display:inline-block;margin:0">Import
+          <input type="file" id="import-progress" accept="application/json" style="display:none">
+        </label>
         ${nEarned ? '<button class="small reset" id="reset-badges">Reset</button>' : ''}`;
       const reset = document.getElementById('reset-badges');
       if (reset) reset.addEventListener('click', () => {
         localStorage.removeItem('mlbb-badges');
         location.reload();
+      });
+
+      /* Progress lives in localStorage, which is per-browser and easy to lose.
+         These move it as a small file. */
+      const KEYS = ['mlbb-badges', 'mlbb-quiz', 'mlbb-capstone', 'mlbb-predict', 'mlbb-duel-best'];
+      const exp = document.getElementById('export-progress');
+      if (exp) exp.addEventListener('click', () => {
+        const out = {};
+        for (const k of KEYS) { const v = localStorage.getItem(k); if (v !== null) out[k] = v; }
+        const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'learn-ml-progress.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+      const imp = document.getElementById('import-progress');
+      if (imp) imp.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const obj = JSON.parse(reader.result);
+            for (const k of KEYS) if (obj[k] !== undefined) localStorage.setItem(k, obj[k]);
+            location.reload();
+          } catch (err) {
+            alert('That file could not be read as saved progress.');
+          }
+        };
+        reader.readAsText(file);
       });
     }
 

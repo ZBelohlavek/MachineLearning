@@ -133,7 +133,7 @@ nav.site-nav a {
 nav.site-nav a:hover { background: var(--panel); color: var(--text); text-decoration: none; }
 nav.site-nav a.active { background: var(--panel-2); color: var(--text); }
 
-@media (max-width: 940px) {
+@media (max-width: 1150px) {
   header.site .wrap {
     height: auto;
     flex-direction: column;
@@ -455,6 +455,13 @@ kbd {
 .mt0 { margin-top: 0; } .mb0 { margin-bottom: 0; }
 
 /* ---------- badges and toasts ---------- */
+
+/* Visible only to assistive technology. */
+.sr-live {
+  position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
 
 .toast-host {
   position: fixed; right: 18px; bottom: 18px; z-index: 90;

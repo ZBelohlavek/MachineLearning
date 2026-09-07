@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teach a model to write · Learn ML by Building</title>
+<meta name="description" content="Train a character-level transformer in your browser on text you choose, and watch noise turn into words and then into sentences.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  #corpus { width: 100%; min-height: 190px; resize: vertical; font-family: var(--mono); font-size: .82rem;
+            line-height: 1.6; background: #0d1320; color: #cfe0ff; border: 1px solid var(--line);
+            border-radius: 10px; padding: 12px 14px; }
+  #sample-out { background: #0d1320; border: 1px solid var(--line); border-radius: 10px;
+                padding: 14px 16px; font-family: var(--mono); font-size: .86rem; line-height: 1.75;
+                color: var(--text); white-space: pre-wrap; min-height: 150px; word-break: break-word; }
+  #sample-out .prompt { color: var(--accent); background: rgba(77,163,255,.10); border-radius: 3px; }
+  #vocab-view { display: flex; flex-wrap: wrap; gap: 5px; }
+  .vchip { display: inline-flex; flex-direction: column; align-items: center; min-width: 26px;
+           background: var(--bg-soft); border: 1px solid var(--line-soft); border-radius: 6px; padding: 3px 5px; }
+  .vchip b { font-family: var(--mono); font-size: .82rem; color: var(--text); }
+  .vchip i { font-style: normal; font-size: .6rem; color: var(--text-mute); }
+  #lm-attn { width: 100%; max-width: 340px; border-radius: 10px; border: 1px solid var(--line); image-rendering: pixelated; }
+  .pbar { display: grid; grid-template-columns: 22px 1fr 42px; gap: 8px; align-items: center; margin: 4px 0; font-size: .8rem; }
+  .pbar .d { font-family: var(--mono); color: var(--text); text-align: center; }
+  .pbar .track { height: 9px; background: var(--line-soft); border-radius: 5px; overflow: hidden; }
+  .pbar .track i { display: block; height: 100%; background: var(--accent-2); border-radius: 5px; }
+  .pbar .v { font-family: var(--mono); font-size: .74rem; color: var(--text-dim); text-align: right; }
+  #prompt { width: 100%; font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Attention · where it came from</div>
+    <h1>Teach a model to write</h1>
+    <p class="lead">
+      The attention block from the Vision Transformer lesson was not invented for images. Here it is
+      pointed at its original target: text, one character at a time. Give it a page of writing, press
+      train, and watch the samples go from noise to letters to words to something that reads almost
+      like a sentence — in about a minute, on your machine, from ten thousand numbers.
+    </p>
+  </div>
+
+  <div id="lesson-goals"></div>
+
+  <div class="section">
+    <h2>Text is just a sequence of symbols</h2>
+    <p>
+      The model has no notion of words, spelling or grammar. It sees a list of character IDs, drawn
+      from whatever characters appear in your corpus, and its whole job is: <em>given the last few
+      characters, which character comes next?</em> That's a classification problem with one class per
+      character, asked once per position.
+    </p>
+    <p>
+      Everything that looks like knowledge afterwards — that <code>q</code> is followed by
+      <code>u</code>, that a full stop is followed by a space and a letter, that "the" is a very
+      common way to start — is a consequence of getting that one question right often enough.
+    </p>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title">
+          <h3>The corpus</h3>
+          <span class="hint">edit it, or paste your own writing</span>
+        </div>
+        <div id="corpus-presets" style="margin-bottom:10px"></div>
+        <textarea id="corpus" spellcheck="false" aria-label="Training corpus"></textarea>
+        <p class="muted" style="font-size:.8rem;margin:10px 0 0">
+          Anything works, but short and heavily patterned works best — a ten-thousand-parameter model
+          learns structure long before it learns meaning. Your text never leaves the page.
+        </p>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>The vocabulary</h3><span class="hint">every distinct character, and its ID</span></div>
+        <div id="vocab-view"></div>
+        <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
+          Real language models use <em>sub-word</em> tokens instead — a few tens of thousands of
+          fragments like <code>ing</code> or <code>▁the</code> — which makes sequences far shorter and
+          training far cheaper. Characters are the honest version to learn on: no tokenizer to hide
+          behind, and you can read every ID in the table.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Train it</h2>
+    <p>
+      Press train and read the sample box. Expect nonsense for a few seconds, then plausible letter
+      pairs, then real words with broken grammar, then whole clauses copied from the rhythm of your
+      corpus. The loss you're watching is measured in nats per character: it starts near
+      <code>ln(vocabulary)</code> — pure guessing — and every drop is the model finding structure.
+    </p>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>What it writes</h3><span class="hint">the prompt is highlighted</span></div>
+        <div id="sample-out"></div>
+        <div class="field" style="margin-top:12px">
+          <label class="row"><span>Prompt</span></label>
+          <input type="text" id="prompt" value="the " aria-label="Prompt for the model">
+        </div>
+        <div class="controls">
+          <button id="btn-train" class="primary">▶ Train the model</button>
+          <button id="btn-sample">Write another</button>
+          <button id="btn-reset" class="danger">Start over</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Progress</h3></div>
+        <div id="lm-stats"></div>
+        <div id="run-bar"></div>
+        <canvas id="lm-chart" class="fit" role="img" aria-label="Chart of training loss per step."></canvas>
+        <p class="muted" style="font-size:.8rem;margin-top:10px">
+          A loss of 1.0 means the model is, on average, about as uncertain as a two-and-a-half-way
+          coin flip at each character. Below that it is writing recognisable words.
+        </p>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <div class="panel-title"><h3>Settings</h3><span class="hint">changing the model restarts training</span></div>
+      <div id="lm-config" class="split even" style="gap:6px 26px"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>What it is actually deciding</h2>
+    <p>
+      At every step the model produces a probability for each character in the vocabulary, and one is
+      drawn at random. Type in the prompt box and watch the distribution change — after training,
+      <code>th</code> makes <code>e</code> overwhelming, and a full stop makes a space almost certain.
+    </p>
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>Next character</h3><span class="hint">top 8, for the prompt above</span></div>
+        <div id="next-probs"></div>
+        <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
+          Temperature reshapes exactly this list before the draw. Low temperature sharpens it toward
+          the single most likely character — which is why it eventually repeats itself forever.
+        </p>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Causal attention</h3><span class="hint">rows look along their own row only</span></div>
+        <canvas id="lm-attn" role="img" aria-label="Causal attention map: a triangular matrix, because each position may only attend to itself and earlier positions."></canvas>
+        <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
+          The map is a triangle, and that shape <em>is</em> the rule: position <i>t</i> may attend to
+          positions 0…<i>t</i> and nothing later. Without it, the model could read the answer it was
+          being asked to predict, the loss would collapse to zero, and the samples would be garbage.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>How this differs from the models you've heard of</h2>
+    <p>
+      What's on this page is the real architecture: embeddings, causal self-attention, a residual
+      stream, layer norm, a feed-forward block, and a softmax over the vocabulary. A production
+      language model is the same diagram with three things changed, and none of them is a new idea.
+    </p>
+    <ul>
+      <li><strong>Scale.</strong> This has around ten thousand parameters and one block. A frontier
+        model has hundreds of billions and a hundred or more blocks — the same shape, stacked and
+        widened until it stops fitting on a single machine.</li>
+      <li><strong>Tokens.</strong> Sub-word pieces instead of characters, so a sequence of a thousand
+        words is a thousand-odd tokens rather than five thousand characters.</li>
+      <li><strong>Data.</strong> Your corpus here is a few thousand characters. Theirs is measured in
+        trillions of tokens, which is where almost everything that looks like knowledge comes from.</li>
+    </ul>
+    <div class="note">
+      <b class="label">The uncomfortable part</b>
+      <p class="mb0">Watch your model produce a sentence that is grammatical and completely made up.
+      It has no notion of truth — it is sampling a plausible next character, repeatedly. Everything
+      unsettling about how large language models fail is visible in miniature here, at a scale where
+      you can see exactly why it happens.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><strong>Drop the context to 8 characters and train.</strong> Spelling survives; sentence
+        structure does not. The model literally cannot see far enough back to know where it is.</li>
+      <li><strong>Set the temperature to 0.1, then 1.5.</strong> One repeats a single phrase forever,
+        the other invents spellings. The readable range is narrow and worth finding by hand.</li>
+      <li><strong>Paste in your own writing</strong> — an email, some notes, anything a few thousand
+        characters long. A model this small will parrot your habits: your favourite sentence
+        openings, your punctuation, your tics.</li>
+      <li><strong>Train on the recipe, then prompt with "heat the".</strong> It has learned the
+        grammar of instructions without being told there is such a thing.</li>
+      <li><strong>Pin the loss curve, halve the embedding size, and train again.</strong> Same seed,
+        same data, one change — a controlled experiment about capacity.</li>
+      <li><strong>Watch the attention map after training.</strong> Look at the row for a character
+        that follows a space: it usually attends back to the start of the word it is in the middle of.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on what you just made happen. They are not a test you can fail — the
+      explanation appears either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/cnn.js"></script>
+<script src="../assets/js/lib/vit.js"></script>
+<script src="../assets/js/lib/charlm.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
+<script src="../assets/js/lessons/language.js"></script>
+</body>
+</html>

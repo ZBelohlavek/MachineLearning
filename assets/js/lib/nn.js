@@ -210,6 +210,27 @@
       return this.layers.reduce((n, l) => n + l.W.length + l.b.length, 0);
     }
 
+    /** All weights as one flat Float32Array — cheap to send between threads. */
+    toFlat(out) {
+      const n = this.numParams();
+      const buf = out && out.length === n ? out : new Float32Array(n);
+      let k = 0;
+      for (const l of this.layers) {
+        buf.set(l.W, k); k += l.W.length;
+        buf.set(l.b, k); k += l.b.length;
+      }
+      return buf;
+    }
+
+    fromFlat(buf) {
+      let k = 0;
+      for (const l of this.layers) {
+        l.W.set(buf.subarray(k, k + l.W.length)); k += l.W.length;
+        l.b.set(buf.subarray(k, k + l.b.length)); k += l.b.length;
+      }
+      return this;
+    }
+
     toJSON() {
       return {
         sizes: this.sizes,

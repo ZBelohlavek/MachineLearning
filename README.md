@@ -21,6 +21,7 @@ python3 -m http.server 8000     # then open http://localhost:8000
 | **[Convolutions](lessons/convolutions.html)** | Slide a 3×3 kernel across an image and see every multiplication | Kernels, feature maps, padding, stride, pooling |
 | **[Train a CNN](lessons/cnn-digits.html)** | Train a convolutional net on generated digits, then draw one yourself | Conv layers, augmentation, confusion matrices, learned filters |
 | **[Vision Transformers](lessons/vision-transformer.html)** | Cut an image into patches and train a real attention model | Patch embeddings, queries/keys/values, attention maps, position embeddings |
+| **[Teach a model to write](lessons/language.html)** | Train a character-level transformer on text you choose and read what it writes | Tokenisation, causal attention, next-token prediction, temperature |
 | **[Q-Learning](lessons/gridworld.html)** | Build a maze, watch a value table fill in square by square, then race the agent through it | States, actions, rewards, the Bellman update, exploration vs exploitation |
 | **[Evolve a driver](lessons/evolve-a-driver.html)** | Watch sixty cars learn to drive a track you drew, then race the champion | Neuroevolution, fitness functions, selection and mutation, gradient-free learning |
 | **[Rocket League Bot](lessons/rocket-league.html)** | Design the reward function and train a self-play agent to score | Policy gradients, PPO, advantage estimation, reward shaping, self-play |
@@ -85,7 +86,8 @@ tools/
 assets/js/lib/
   nn.js       Dense layers, backpropagation, Adam, softmax, seedable RNG
   cnn.js      Conv2D, ReLU, MaxPool2, Flatten, FC — with hand-written backward passes
-  vit.js      Token linear layers, single-head self-attention, LayerNorm, a small ViT
+  vit.js      Token linear layers, multi-head self-attention (optionally causal), LayerNorm, a ViT
+  charlm.js   A character-level causal transformer built from the same pieces
   digits.js   A digit dataset generated with the canvas text API
   plot.js     Canvas line charts and colour maps
   ui.js       Shared page chrome, sliders, pills, stat tiles, badges, quizzes
@@ -156,6 +158,15 @@ the maze, editing kernels, switching architectures) and fails on any console err
 The site is plain static files, so GitHub Pages serves it as-is: in the repository's
 **Settings → Pages**, set the source to the branch and the `/ (root)` folder. No build step, no
 workflow, no configuration file.
+
+## A note on serving vs opening from disk
+
+Everything works when you open `index.html` straight from disk, with one exception worth knowing:
+browsers block Web Workers on `file://`, so the Rocket League lesson falls back to training on the
+page's own thread. Training is the same speed either way — it is one CPU either way — but measured
+over 20 seconds, the worker holds a steady 16.7ms frame time while the inline fallback averages 33ms
+with stalls up to half a second. If you want the arena to be watchable while it trains, serve the
+folder over http.
 
 ## Browser support
 

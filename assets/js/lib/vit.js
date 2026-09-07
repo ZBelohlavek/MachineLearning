@@ -83,8 +83,11 @@
    * average them into one map.
    */
   class SelfAttention {
-    constructor(T, d, rand = Math.random, heads = 1) {
+    constructor(T, d, rand = Math.random, heads = 1, causal = false) {
       const H = Math.max(1, Math.min(heads, d));
+      // Causal attention lets a token see itself and everything before it, but
+      // nothing after — which is what makes next-token prediction honest.
+      this.causal = causal;
       this.T = T; this.d = d; this.H = H; this.dh = Math.floor(d / H);
       this.scale = 1 / Math.sqrt(this.dh);
       this.q = new TokenLinear(T, d, d, rand, 0.5 / Math.sqrt(d));
@@ -128,24 +131,26 @@
       for (let h = 0; h < H; h++) {
         const off = h * dh, base = h * T * T;
         for (let t = 0; t < T; t++) {
+          const last = this.causal ? t : T - 1;
           let max = -Infinity;
-          for (let u = 0; u < T; u++) {
+          for (let u = 0; u <= last; u++) {
             let sc = 0;
             for (let i = 0; i < dh; i++) sc += Qv[t * d + off + i] * K[u * d + off + i];
             sc *= scale;
             A[base + t * T + u] = sc;
             if (sc > max) max = sc;
           }
+          for (let u = last + 1; u < T; u++) A[base + t * T + u] = 0;    // masked out
           let sum = 0;
-          for (let u = 0; u < T; u++) {
+          for (let u = 0; u <= last; u++) {
             const e = Math.exp(A[base + t * T + u] - max);
             A[base + t * T + u] = e;
             sum += e;
           }
-          for (let u = 0; u < T; u++) A[base + t * T + u] /= sum;
+          for (let u = 0; u <= last; u++) A[base + t * T + u] /= sum;
           for (let i = 0; i < dh; i++) {
             let acc = 0;
-            for (let u = 0; u < T; u++) acc += A[base + t * T + u] * V[u * d + off + i];
+            for (let u = 0; u <= last; u++) acc += A[base + t * T + u] * V[u * d + off + i];
             C[t * d + off + i] = acc;
           }
         }
@@ -162,22 +167,24 @@
       for (let h = 0; h < H; h++) {
         const off = h * dh, base = h * T * T;
         for (let t = 0; t < T; t++) {
-          for (let u = 0; u < T; u++) {
+          const last = this.causal ? t : T - 1;
+          for (let u = 0; u <= last; u++) {
             let sc = 0;
             for (let i = 0; i < dh; i++) sc += dC[t * d + off + i] * Vv[u * d + off + i];
             dA[base + t * T + u] = sc;                       // dL/dA
           }
-          for (let u = 0; u < T; u++) {
+          for (let u = 0; u <= last; u++) {
             const a = A[base + t * T + u];
             for (let i = 0; i < dh; i++) dV[u * d + off + i] += a * dC[t * d + off + i];
           }
           // softmax jacobian, row by row: dS = A * (dA - sum(A*dA))
           let dot = 0;
-          for (let u = 0; u < T; u++) dot += A[base + t * T + u] * dA[base + t * T + u];
-          for (let u = 0; u < T; u++) {
+          for (let u = 0; u <= last; u++) dot += A[base + t * T + u] * dA[base + t * T + u];
+          for (let u = last + 1; u < T; u++) dS[base + t * T + u] = 0;
+          for (let u = 0; u <= last; u++) {
             dS[base + t * T + u] = A[base + t * T + u] * (dA[base + t * T + u] - dot);
           }
-          for (let u = 0; u < T; u++) {
+          for (let u = 0; u <= last; u++) {
             const g = dS[base + t * T + u] * scale;
             if (g === 0) continue;
             for (let i = 0; i < dh; i++) {

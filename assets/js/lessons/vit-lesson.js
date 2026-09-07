@@ -14,7 +14,7 @@
     chrome('attention', '../');
     window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.attention);
     window.ML.goalPanel(document.getElementById('lesson-goals'), 'attention');
-    nextLinks(document.getElementById('next-links'), 'cnn', 'gridworld', '../');
+    nextLinks(document.getElementById('next-links'), 'cnn', 'language', '../');
 
     let patch = 4, dim = 24, lr = 0.004, batchSize = 16, aug = 1;
     let useCLS = false, useNorm = false, trainSize = 3000, heads = 1;

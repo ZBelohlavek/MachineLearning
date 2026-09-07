@@ -562,6 +562,7 @@
       note: 'Same seed, same digits and same starting weights.',
     });
 
+    const say = window.ML.announcer();
     const btnTrain = document.getElementById('btn-train');
     btnTrain.addEventListener('click', () => {
       running = !running;
@@ -630,6 +631,7 @@
           sinceEval = 0;
           const ev = evaluate();
           setStat('test acc', (ev.acc * 100).toFixed(1) + '%', ev.acc > 0.9 ? 'good' : '');
+          say(`${seen.toLocaleString()} images seen. Test accuracy ${(ev.acc * 100).toFixed(0)} percent.`);
           if (ev.acc >= 0.95 && fromScratch) {
             achieve('cnn-trained', `${(ev.acc * 100).toFixed(1)}% test accuracy from random weights`);
           }

@@ -174,6 +174,46 @@
       ],
     },
 
+    language: {
+      id: 'language', badge: 'quiz-language',
+      title: 'Check yourself · language models',
+      questions: [
+        {
+          q: 'Attention here is <em>causal</em>: position t may look at positions 0 to t and no further. Why does that matter?',
+          options: [
+            'It makes the model faster',
+            'Without it, predicting the next character could simply read the answer from the future',
+            'It keeps the attention map symmetric',
+            'It reduces the number of parameters',
+          ],
+          answer: 1,
+          why: 'The training signal is "what character comes next", and every position is asked at once. If a position could see ahead, it would learn to copy the answer rather than predict it — training loss would collapse to nothing and the model would generate garbage. The triangular attention map on this page is that constraint made visible.',
+        },
+        {
+          q: 'Your model has a 24-character context. What can it never learn?',
+          options: [
+            'The spelling of common words',
+            'That a sentence tends to end in a full stop',
+            'That a name mentioned at the start of a paragraph should reappear at the end',
+            'Which characters usually follow a space',
+          ],
+          answer: 2,
+          why: 'Anything further back than the window simply does not exist to the model — there is no memory beyond it. Spelling and local punctuation fit comfortably inside 24 characters; a callback across a paragraph does not. Context length is the single most consequential number in a language model, and the reason so much engineering goes into extending it.',
+        },
+        {
+          q: 'You drop the temperature to 0.1 and the sample becomes one phrase repeated forever. Why?',
+          options: [
+            'The model has stopped learning',
+            'Low temperature sharpens the distribution until it always picks its single most likely character, and that loops',
+            'The context window is too short',
+            'The vocabulary is too small',
+          ],
+          answer: 1,
+          why: 'Temperature divides the scores before the softmax. Near zero the largest score wins every time, so generation becomes deterministic — and a deterministic walk through a finite context will eventually revisit a state and repeat forever. Above 1 the opposite happens: the distribution flattens and it invents spellings. The interesting text lives in between.',
+        },
+      ],
+    },
+
     gridworld: {
       id: 'gridworld', badge: 'quiz-gridworld',
       title: 'Check yourself · Q-learning',

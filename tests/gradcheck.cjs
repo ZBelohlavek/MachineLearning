@@ -26,6 +26,7 @@ const path = require('path');
 const nn = require(path.join(__dirname, '../assets/js/lib/nn.js'));
 const cnnLib = require(path.join(__dirname, '../assets/js/lib/cnn.js'));
 const vitLib = require(path.join(__dirname, '../assets/js/lib/vit.js'));
+const charLib = require(path.join(__dirname, '../assets/js/lib/charlm.js'));
 
 let failures = 0;
 
@@ -181,6 +182,31 @@ for (const cfg of [
   const blocks = net.params().map((p) => ({ values: p.v, grads: p.g }));
   run(`vit.js  ViT (${cfg.useCLS ? 'cls' : 'mean'}, ${cfg.useNorm ? 'norm' : 'no norm'}, ` +
       `${cfg.heads || 1} head${(cfg.heads || 1) > 1 ? 's' : ''})`, loss, blocks, rand);
+}
+
+/* ------------------- the character-level language model ------------------ */
+{
+  const rand = nn.mulberry32(11);
+  const text = 'the sea is calm tonight, the tide is full and the moon lies fair. ';
+  const vocab = charLib.buildVocab(text);
+  const net = new charLib.CharLM({ vocab: vocab.size, context: 8, dim: 12, mlpHidden: 16, rand, heads: 2 });
+  const ids = Int32Array.from(vocab.encode(text.slice(0, 8)));
+  const targets = Int32Array.from(vocab.encode(text.slice(1, 9)));
+  const loss = () => net.lossAndGrad(net.forward(ids), targets).loss;
+  net.zeroGrad();
+  net.backward(net.lossAndGrad(net.forward(ids), targets).dLogits);
+  const blocks = net.params().map((p) => ({ values: p.v, grads: p.g }));
+  run('charlm.js  causal transformer (2 heads)', loss, blocks, rand);
+
+  // causality: a later character must not change an earlier position's logits
+  const before = Array.from(net.forward(ids).slice(0, vocab.size));
+  const poked = Int32Array.from(ids);
+  poked[7] = (poked[7] + 3) % vocab.size;
+  const after = Array.from(net.forward(poked).slice(0, vocab.size));
+  const leaked = before.some((v, i) => Math.abs(v - after[i]) > 1e-6);
+  if (leaked) failures++;
+  console.log(`${leaked ? ' FAIL ' : '  ok  '} ${'charlm.js  no peeking at the future'.padEnd(36)} ` +
+    'changing the last character leaves position 0 untouched');
 }
 
 /* --------------- the RL environment: sanity rather than gradients -------- */

@@ -50,6 +50,15 @@
       time: '20 min',
     },
     {
+      id: 'language',
+      href: 'lessons/language.html',
+      nav: 'Language',
+      title: 'Teach a model to write',
+      blurb: 'The same attention block, pointed at text. Feed it a page of your own writing and watch noise turn into words, then into sentences, in about a minute.',
+      tags: [['cv', 'attention'], ['', 'transformer'], ['', 'generation']],
+      time: '25 min',
+    },
+    {
       id: 'gridworld',
       href: 'lessons/gridworld.html',
       nav: 'Q-Learning',
@@ -176,6 +185,12 @@
     { id: 'quiz-cnn', lesson: 'cnn', label: 'Passed the quiz',
       hint: 'Answer all three questions correctly' },
     { id: 'quiz-attention', lesson: 'attention', label: 'Passed the quiz',
+      hint: 'Answer all three questions correctly' },
+    { id: 'lm-words', lesson: 'language', label: 'Taught it to write words',
+      hint: 'Train until the loss drops below 1.0' },
+    { id: 'lm-own', lesson: 'language', label: 'Trained it on your own text',
+      hint: 'Paste your own writing into the corpus box' },
+    { id: 'quiz-language', lesson: 'language', label: 'Passed the quiz',
       hint: 'Answer all three questions correctly' },
     { id: 'quiz-gridworld', lesson: 'gridworld', label: 'Passed the quiz',
       hint: 'Answer all three questions correctly' },
@@ -535,6 +550,33 @@
     };
   }
 
+  /**
+   * A polite live region.
+   *
+   * Everything interesting on this site happens inside a canvas, which is
+   * invisible to a screen reader however well it is labelled. This announces
+   * the numbers that matter — accuracy, goals, loss — at a pace that informs
+   * rather than interrupts.
+   */
+  function announcer(throttleMs = 9000) {
+    let node = document.querySelector('.sr-live');
+    if (!node) {
+      node = document.createElement('div');
+      node.className = 'sr-live';
+      node.setAttribute('role', 'status');
+      node.setAttribute('aria-live', 'polite');
+      document.body.appendChild(node);
+    }
+    let last = 0, lastText = '';
+    return (text) => {
+      const now = Date.now();
+      if (text === lastText || now - last < throttleMs) return;
+      last = now;
+      lastText = text;
+      node.textContent = text;
+    };
+  }
+
   /* ------------------------- controls ------------------------- */
 
   /**
@@ -707,6 +749,6 @@
   }
 
   return { LESSONS, BADGES, chrome, nextLinks, achieve, badgesEarned, onBadge,
-           quiz, goalPanel, dpad, runBar, predictBox, slider, pills, checkbox, statGrid,
+           quiz, goalPanel, dpad, runBar, predictBox, announcer, slider, pills, checkbox, statGrid,
            rafLoop, pointerPos };
 });
