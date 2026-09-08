@@ -21,10 +21,10 @@
     <div class="kicker">Reinforcement learning · foundations</div>
     <h1>Reinforcement learning from zero</h1>
     <p class="lead">
-      Before a neural network drives a car, understand the idea underneath it with something you can
-      see all of at once. Here an agent knows nothing about the maze you draw. It bumps into walls,
-      falls into pits, and slowly fills in a number for every move in every square — until a route
-      appears that nobody told it about.
+      Before a neural network drives a car, get the idea underneath it from something small enough to
+      see all at once. The agent here knows nothing about the maze you draw. It walks into walls, falls
+      into pits, and gradually fills in a number for every move in every square, until a route appears
+      that nobody ever told it about.
     </p>
   </div>
 
@@ -33,8 +33,8 @@
   <div class="section">
     <h2>The setup: states, actions, rewards</h2>
     <p>
-      Reinforcement learning always starts with the same four things, and it's worth naming them
-      concretely before any maths shows up:
+      Every reinforcement learning problem is built from the same four pieces. Worth naming them on
+      something this small before any maths turns up:
     </p>
     <div class="legend-grid">
       <div class="panel"><b>State</b><p class="mb0" style="font-size:.88rem">Which square the agent is standing on. 88 of them here.</p></div>
@@ -43,19 +43,19 @@
       <div class="panel"><b>Policy</b><p class="mb0" style="font-size:.88rem">The rule it follows: which action to pick in each state. This is what gets learned.</p></div>
     </div>
     <p style="margin-top:18px">
-      The agent's memory is a table called <strong>Q</strong>. For each square and each of the four
-      directions it holds one number: <em>if I take this move here and act sensibly afterwards, how
-      much total reward should I expect?</em> Every square in the grid below is drawn as four
-      triangles — one per direction — shaded by that number. Green is promising, red is regret.
+      The agent's memory is one table, called Q. For every square and every direction it stores a single
+      number answering: if I go this way from here and play sensibly afterwards, how much total reward
+      should I expect? Each square below is drawn as four triangles, one per direction, shaded by that
+      number. Green means promising, red means regret.
     </p>
   </div>
 
   <div class="section">
     <h2>Watch it learn</h2>
     <p>
-      Press Run. Draw walls and pits with the mouse while it's running — the agent won't be told
-      you changed anything, and watching it recover from a wall dropped across its favourite route
-      is the most instructive thing on this page.
+      Press Run. You can draw walls and pits with the mouse while it's still running, and nobody tells
+      the agent you've done it. Dropping a wall across its favourite route and watching it work out a new
+      one is the most useful thing on this page.
     </p>
 
     <div class="split">
@@ -93,8 +93,8 @@
         <canvas id="gw-chart" class="fit" style="margin-top:14px" role="img" aria-label="Chart of steps taken per episode."></canvas>
         <canvas id="gw-chart-r" class="fit" style="margin-top:10px" role="img" aria-label="Chart of reward collected per episode."></canvas>
         <p class="muted" style="font-size:.8rem;margin-top:10px">
-          Steps per episode is the clearest sign of learning: it starts in the hundreds — pure
-          wandering — and drops toward the length of the shortest safe route.
+          Steps per episode is the clearest sign that anything is happening. It starts in the hundreds,
+          which is just wandering, and falls toward the length of the shortest safe route.
         </p>
       </div>
     </div>
@@ -103,24 +103,23 @@
   <div class="section">
     <h2>The one equation</h2>
     <p>
-      Every single step the agent takes runs this update, and nothing else. It is the whole algorithm:
+      Every step the agent takes runs this one update, and nothing else. This is the entire algorithm:
     </p>
     <div class="eq">
       Q(s,a) &nbsp;←&nbsp; Q(s,a) &nbsp;+&nbsp; α&nbsp;[&nbsp;<span class="hl2">r&nbsp;+&nbsp;γ&nbsp;max<sub>a′</sub>&nbsp;Q(s′,a′)</span>&nbsp;−&nbsp;<span class="hl">Q(s,a)</span>&nbsp;]
     </div>
     <p style="margin-top:16px">
       Read it as a correction. The green part is a fresh estimate of what that move was worth: the
-      reward you just got, plus the discounted value of the best move available from wherever you
-      landed. The blue part is what you believed before. The difference between them — the
-      <strong>temporal-difference error</strong> — is the surprise, and α decides what fraction of the
-      surprise you take on board.
+      reward you just collected, plus the discounted value of the best move available from wherever you
+      ended up. The blue part is what you believed a moment ago. The gap between them is the surprise, and
+      α decides how much of the surprise you're willing to believe.
     </p>
     <p>
-      The clever bit is <code>max<sub>a′</sub></code>. The agent bootstraps: it improves its guess
-      using another of its own guesses. Early on those guesses are all zero and nothing seems to
-      happen — until the first time it stumbles into the goal. That single +1 gets carried one square
-      backwards per visit, and if you run at "Step by step" right after a success you can watch the
-      value spread back down the corridor.
+      The clever bit is that max. The agent bootstraps, improving one of its guesses using another of
+      its guesses. Early on every guess is zero and nothing appears to happen, right up until the first
+      accidental arrival at the goal. That single +1 then walks one square backwards per visit. Set the
+      speed to "Step by step" straight after a success and you can watch the value crawl back down the
+      corridor.
     </p>
 
     <div class="panel">
@@ -133,22 +132,24 @@
 
     <div class="note good" style="margin-top:18px">
       <b class="label">Race it yourself</b>
-      <p class="mb0">Press <b>Race the agent</b> and walk the maze yourself — arrow keys, or the
-      on-screen pad on a phone. You will
-      almost certainly win, and the interesting part is <em>why</em>: you can see the whole grid at
-      once and you already know what a pit is. The agent gets one square of feedback at a time and
-      had to discover that pits are bad by falling in them. Every RL result you read about is a
-      system solving a problem under that handicap.</p>
+      <p class="mb0">
+        Press Race the agent and walk the maze yourself, arrow keys or the on-screen pad. You'll almost
+        certainly win. The interesting bit is why: you can see the entire grid at once and you already knew
+        what a pit was before you started. The agent gets one square of feedback at a time and had to
+        discover that pits are bad by falling into several. Every impressive RL result you've read about is
+        a system solving its problem under that handicap.
+      </p>
     </div>
 
     <div class="note" style="margin-top:18px">
       <b class="label">Exploration versus exploitation</b>
-      <p class="mb0">With ε = 0 the agent always takes the move it currently believes is best. That
-      sounds smart and is often fatal: the first mediocre route it finds becomes the only route it
-      will ever consider, because it never tries anything else long enough to learn better. With
-      ε = 1 it wanders forever and learns a great Q-table it never actually uses. Every RL algorithm
-      ever written is some answer to this tension — including the entropy bonus in the
-      Rocket League lesson.</p>
+      <p class="mb0">
+        With ε = 0 the agent always takes whatever move it currently rates highest. That sounds sensible
+        and is frequently fatal: the first mediocre route it stumbles on becomes the only route it will ever
+        consider, because it never tries anything else for long enough to learn better. With ε = 1 it
+        wanders forever and builds a lovely Q-table it never uses. Every RL algorithm ever written is some
+        answer to that tension, including the entropy bonus over in the Rocket League lesson.
+      </p>
     </div>
   </div>
 
@@ -162,37 +163,48 @@
   <div class="section">
     <h2>Experiments worth running</h2>
     <ul>
-      <li><strong>The cliff.</strong> Load "Cliff walk". The fast route runs along the edge of a row of
-        pits; the safe route goes the long way around. Now raise ε to 0.4 and watch the agent
-        deliberately avoid the edge — with random moves in the mix, walking next to a cliff genuinely
-        <em>is</em> worse. It isn't being timid; it's being correct about the world it lives in.</li>
-      <li><strong>Turn off the step cost.</strong> Set it to 0.000. The agent still reaches the goal,
-        but it stops caring how long it takes, and the arrows go from a clean route to an aimless
-        drift. Cost of time is what makes a policy efficient.</li>
-      <li><strong>Make the floor slippery.</strong> At 40% slip, actions only mostly work. Watch the
-        values near pits go deeply negative — the agent learns to keep a safety margin, which is
-        exactly what you'd want a robot to do.</li>
-      <li><strong>Drop γ to 0.6.</strong> Distant rewards get discounted into irrelevance. In a long
-        maze the agent can no longer see far enough ahead to bother.</li>
-      <li><strong>Move the goal mid-run.</strong> Draw a new goal somewhere else while it's running.
-        The old values are now lies, and it takes real time to unlearn them — a small taste of why
-        changing environments are hard.</li>
+      <li>
+        <b>The cliff.</b> Load "Cliff walk". The quick route runs along the lip of a row of pits and the
+        safe route goes the long way round. Now push ε up to 0.4 and watch the agent start avoiding the
+        edge. With random moves in the mix, walking next to a cliff genuinely is worse. It isn't being
+        timid, it's being right about the world it lives in.
+      </li>
+      <li>
+        <b>Turn off the step cost.</b> Set it to 0.000. The agent still gets to the goal, it just stops
+        caring how long that takes, and the arrows go from a clean route to an aimless drift. Charging for
+        time is what makes a policy efficient.
+      </li>
+      <li>
+        <b>Make the floor slippery.</b> At 40% slip, actions only mostly work. Watch the values near pits
+        go deeply negative as the agent learns to keep a safety margin, which is exactly the instinct you'd
+        want in a robot.
+      </li>
+      <li>
+        <b>Drop γ to 0.6.</b> Distant rewards get discounted into irrelevance, and in a long maze the
+        agent can no longer see far enough ahead to care.
+      </li>
+      <li>
+        <b>Move the goal mid-run.</b> Draw a new goal somewhere else while it's running. Every value in
+        the table is now a lie, and unlearning takes real time. Environments that change underneath you are
+        hard for exactly this reason.
+      </li>
     </ul>
     <div class="note good">
       <b class="label">Where this stops working</b>
-      <p class="mb0">The Q-table has one row per state. That's fine for 88 squares. A Rocket League
-      arena has continuous positions, velocities and angles — an infinite number of states, no two
-      ever visited twice. The next lesson replaces the table with a neural network that
-      <em>generalises</em> across states it has never seen, which is precisely what deep
-      reinforcement learning is.</p>
+      <p class="mb0">
+        The Q-table keeps one row per state, which is fine for 88 squares. A Rocket League arena has
+        continuous positions, velocities and angles, so there are infinitely many states and no two episodes
+        ever visit the same one twice. The next lesson swaps the table for a neural network that can
+        generalise to states it has never seen. That swap is the whole of deep reinforcement learning.
+      </p>
     </div>
   </div>
 
   <div class="section">
     <h2>Check yourself</h2>
     <p>
-      Three questions on what you just made happen. They are not a test you can fail — the
-      explanation appears either way, and the wrong answers are the ones worth reading.
+      Three questions on the maze you just watched get solved. You can't fail this — the explanation
+      appears either way, and the wrong answers are the ones worth reading.
     </p>
     <div class="panel" id="quiz"></div>
   </div>

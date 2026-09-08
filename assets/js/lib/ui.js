@@ -18,7 +18,7 @@
       href: 'lessons/foundations.html',
       nav: 'Foundations',
       title: 'How a network learns',
-      blurb: 'Draw your own dataset, then watch a neural network carve it up. Gradient descent, layers, activations and overfitting — all live.',
+      blurb: 'Draw your own dataset, then watch a network carve it up. Gradient descent, layers, activations and overfitting, all of it live.',
       tags: [['core', 'core idea'], ['', 'backprop'], ['', 'gradient descent']],
       time: '15 min',
     },
@@ -27,7 +27,7 @@
       href: 'lessons/convolutions.html',
       nav: 'Convolutions',
       title: 'How a computer sees an edge',
-      blurb: 'Slide a 3×3 kernel over an image by hand, watch the arithmetic, and discover why edge detectors fall out of simple multiplication.',
+      blurb: 'Slide a 3×3 kernel over an image by hand and watch the arithmetic. Edge detectors fall out of nine multiplications and an addition.',
       tags: [['cv', 'vision'], ['', 'kernels'], ['', 'feature maps']],
       time: '15 min',
     },
@@ -36,7 +36,7 @@
       href: 'lessons/cnn-digits.html',
       nav: 'CNNs',
       title: 'Build and train a digit CNN',
-      blurb: 'Assemble a convolutional network layer by layer, train it in your browser on generated digits, then draw your own and watch every feature map light up.',
+      blurb: 'Stack a convolutional network layer by layer, train it on digits your browser invents, then draw one yourself and watch every feature map light up.',
       tags: [['cv', 'vision'], ['', 'CNN'], ['', 'training']],
       time: '25 min',
     },
@@ -45,7 +45,7 @@
       href: 'lessons/vision-transformer.html',
       nav: 'Transformers',
       title: 'Patches, attention and ViTs',
-      blurb: 'Cut an image into patches, compute queries and keys yourself, and see the attention map that a Vision Transformer builds on top of them.',
+      blurb: 'Cut an image into patches, work out the queries and keys yourself, then read the attention map a Vision Transformer builds on top of them.',
       tags: [['cv', 'vision'], ['', 'attention'], ['', 'ViT']],
       time: '20 min',
     },
@@ -54,7 +54,7 @@
       href: 'lessons/language.html',
       nav: 'Language',
       title: 'Teach a model to write',
-      blurb: 'The same attention block, pointed at text. Feed it a page of your own writing and watch noise turn into words, then into sentences, in about a minute.',
+      blurb: 'The same attention block, aimed at text. Feed it a page of your own writing and watch noise become words, then sentences, in about a minute.',
       tags: [['cv', 'attention'], ['', 'transformer'], ['', 'generation']],
       time: '25 min',
     },
@@ -63,7 +63,7 @@
       href: 'lessons/gridworld.html',
       nav: 'Q-Learning',
       title: 'Reinforcement learning from zero',
-      blurb: 'Build a maze, set the rewards, and watch Q-learning fill in the value of every square until a policy emerges out of nothing.',
+      blurb: 'Build a maze, set the rewards, and watch Q-learning fill in a number for every move until a route appears that nobody wrote down.',
       tags: [['rl', 'RL'], ['', 'Q-learning'], ['', 'exploration']],
       time: '20 min',
     },
@@ -72,7 +72,7 @@
       href: 'lessons/evolve-a-driver.html',
       nav: 'Evolution',
       title: 'Evolve a driver from scratch',
-      blurb: 'Sixty cars, sixty tiny brains, no teacher. Watch a population learn to drive a track you drew — then race the champion yourself.',
+      blurb: 'Sixty cars, sixty tiny brains, no teacher at all. A population learns to drive the track you drew, and then it races you.',
       tags: [['rl', 'game'], ['', 'neuroevolution'], ['', 'no gradients']],
       time: '20 min',
     },
@@ -81,7 +81,7 @@
       href: 'lessons/rocket-league.html',
       nav: 'Rocket League',
       title: 'Train a self-play Rocket League bot',
-      blurb: 'The flagship project: design the rewards, train a policy-gradient agent by self-play in a top-down arena, and then take it on yourself.',
+      blurb: 'The big one. Design the rewards, train a policy-gradient agent by self-play in a top-down arena, then find out whether you can beat it.',
       tags: [['rl', 'RL'], ['', 'policy gradient'], ['', 'self-play']],
       time: '40 min',
     },
@@ -91,7 +91,7 @@
       href: 'lessons/final-challenge.html',
       nav: 'Final Challenge',
       title: 'The final challenge',
-      blurb: 'No sliders, no training — just judgement. Pick the right approach for nine real situations, then diagnose four training runs from their curves alone.',
+      blurb: 'No sliders, no training, just judgement. Pick the right approach for nine real situations, then diagnose four training runs from the curves alone.',
       tags: [['core', 'capstone'], ['', 'judgement'], ['', 'diagnosis']],
       time: '15 min',
     },
@@ -190,7 +190,7 @@
     { id: 'conv-scan', lesson: 'convolutions', label: 'Followed the window',
       hint: 'Scan a whole row of the image one pixel at a time' },
     { id: 'conv-challenge', lesson: 'convolutions', label: 'Built a horizontal edge detector',
-      hint: 'Type a kernel that finds horizontal edges — no presets' },
+      hint: 'Type a kernel that finds horizontal edges, no presets' },
     { id: 'cnn-trained', lesson: 'cnn', label: 'Trained a CNN to 95%',
       hint: 'Reach 95% test accuracy from random weights' },
     { id: 'cnn-duel', lesson: 'cnn', label: 'Won a digit duel',
@@ -359,7 +359,7 @@
       <div>
         <h3>${spec.title || 'Check yourself'}</h3>
         <p class="muted">${spec.intro || 'Three questions about what you just watched happen. ' +
-          'Getting one wrong is more useful than getting it right — the explanation is the point.'}</p>
+          'Getting one wrong is more useful than getting it right. The explanation is the point.'}</p>
       </div>
       <div class="quiz-score"><span id="${spec.id}-score">0</span> / ${spec.questions.length}</div>`;
     container.appendChild(head);
@@ -402,7 +402,7 @@
           const right = pick === question.answer;
           if (right) correct++;
           why.className = 'quiz-why ' + (right ? 'right' : 'nope');
-          why.innerHTML = `<b>${right ? 'Correct.' : 'Not quite — ' +
+          why.innerHTML = `<b>${right ? 'Correct.' : 'Not quite. ' +
             'the answer is ' + 'ABCD'[question.answer] + '.'}</b> ${question.why}`;
         }
       });
@@ -412,7 +412,7 @@
       if (done) {
         footerText.innerHTML = correct === spec.questions.length
           ? '<b>All three.</b> You can explain this lesson to someone else now, which is the real test.'
-          : `<b>${correct} of ${spec.questions.length}.</b> Re-read the explanations above, then reset and try again — ` +
+          : `<b>${correct} of ${spec.questions.length}.</b> Re-read the explanations above, then reset and try again. ` +
             'the ones you got wrong are the ones worth going back to the sandbox for.';
         if (correct === spec.questions.length && spec.badge) {
           achieve(spec.badge, `You answered every question in ${spec.title || 'the quiz'}`);
@@ -492,7 +492,7 @@
       pinBtn.classList.toggle('toggle', anyPinned);
       pinBtn.classList.toggle('on', anyPinned);
       note.textContent = anyPinned
-        ? 'The dashed curves are the pinned run — change one setting and compare.'
+        ? 'The dashed curves are your pinned run. Change one setting and compare.'
         : (opts.note || 'Same seed, same data and same starting weights.');
     };
     pinBtn.addEventListener('click', () => {

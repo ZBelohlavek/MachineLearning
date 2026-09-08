@@ -28,7 +28,7 @@
       el.innerHTML = pretrained
         ? '<b class="label">This transformer arrives pre-trained</b><p class="mb0">Its attention ' +
           'maps are already meaningful, so the overlay below shows something real rather than noise. ' +
-          'Press <b>Start over</b> — or change any architecture setting — for random weights and the ' +
+          'Press <b>Start over</b>, or change any architecture setting, for random weights and the ' +
           'from-scratch version.</p>'
         : '<b class="label">Random weights</b><p class="mb0">Attention is currently near-uniform: ' +
           'every patch is mildly interested in everything. That flat map is exactly what an untrained ' +
@@ -455,11 +455,11 @@
       el.innerHTML =
         `<b>${T} patches</b> → ${pairs.toLocaleString()} attention scores per image. ` +
         (T >= 100
-          ? `That is about ${rel}× the arithmetic of the 5×5 setting, so training will crawl — ` +
+          ? `That is about ${rel}× the arithmetic of the 5×5 setting, so training will crawl. ` +
             'attention cost grows with the <em>square</em> of the token count, which is the single ' +
             'biggest practical constraint on transformers and the reason patches exist at all.'
           : 'Attention compares every token with every other, so this cost grows with the square of ' +
-            'the token count — halve the patch size and you roughly sixteen-times the work.');
+            'the token count: halve the patch size and you roughly sixteen-times the work.');
     }
 
     pills(document.getElementById('arch-toggles'), [
@@ -503,7 +503,7 @@
     slider(cfg, {
       label: 'training images', min: 250, max: 6000, step: 250, value: trainSize,
       format: (v) => v.toLocaleString(), onInput: (v) => { trainSize = v | 0; },
-      desc: 'Press "New data" after changing this. A transformer has fewer built-in assumptions than a CNN, so it leans harder on examples — this slider is the cheapest way to see that.',
+      desc: 'Press "New data" after changing this. A transformer has fewer built-in assumptions than a CNN, so it leans harder on examples. This slider is the cheapest way to see that.',
     });
 
     const runControls = window.ML.runBar(document.getElementById('run-bar'), {

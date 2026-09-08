@@ -520,7 +520,7 @@
     slider(hpEl, {
       label: 'slippery floor', min: 0, max: 0.6, step: 0.02, value: 0,
       format: (v) => (v * 100).toFixed(0) + '%', onInput: (v) => { grid.slip = v; },
-      desc: 'Chance the world ignores your action and moves you sideways instead — a stochastic environment.',
+      desc: 'Chance the world ignores your action and moves you sideways instead. A stochastic environment.',
     });
 
     checkbox(hpEl, 'Show state values', true, (v) => { showValues = v; draw(); });

@@ -24,7 +24,10 @@ let pass = 0, fail = 0;
 const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name} ${extra}`); };
 
 (async () => {
-  const browser = await chromium.launch();
+  // Honour a preinstalled browser when one is pinned by the environment; CI
+  // installs its own and leaves this unset.
+  const browser = await chromium.launch(
+    process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 950 } });
   const errs = [];
   const open = async (p) => {

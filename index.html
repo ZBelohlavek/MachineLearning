@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Learn ML by Building — interactive machine learning, trained in your browser</title>
-<meta name="description" content="Six interactive lessons on machine learning: neural networks, convolutions, CNNs, vision transformers, Q-learning, and a self-play Rocket League bot you train yourself.">
+<meta name="description" content="Eight interactive lessons and a capstone: neural networks, convolutions, CNNs, vision transformers, a character-level language model, Q-learning, neuroevolution, and a self-play Rocket League bot you train in your browser.">
 <link rel="stylesheet" href="assets/css/site.css">
 <style>
   .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 34px; align-items: center; }
@@ -23,13 +23,14 @@
   <div class="hero">
     <div class="hero-grid">
       <div>
-        <span class="eyebrow">interactive · no installs · nothing pre-trained</span>
+        <span class="eyebrow">interactive · no installs · no server</span>
         <h1>Learn machine learning by building it</h1>
         <p class="lead">
-          Eight lessons and a capstone, each one a working model you train yourself in the browser.
-          Design the reward function for a Rocket League bot and watch it teach itself to score.
-          Evolve a population of cars around a track you drew, then race the winner. Train a tiny
-          language model on your own writing and watch noise turn into sentences.
+          Eight lessons and a capstone, all of them running on your own machine while you watch.
+          You write the reward function for a Rocket League bot, and it does exactly what that
+          function says, which is rarely what you meant. You draw a track, sixty cars evolve their
+          way around it, and the survivor beats you in a race. By the last lesson you're feeding a
+          page of your own writing to a transformer and watching it learn to spell.
         </p>
         <div class="controls" style="margin-top:22px">
           <a class="btn primary" href="lessons/foundations.html" style="text-decoration:none">Start at the beginning</a>
@@ -43,34 +44,36 @@
   <div class="pitch">
     <div class="panel">
       <b>Everything runs here</b>
-      <p class="mb0" style="font-size:.9rem">No servers, no API keys, no downloads. Backpropagation,
-      Adam, PPO, convolutions, attention and a causal transformer are all plain JavaScript in this
-      repository, and your machine does the training.</p>
+      <p class="mb0" style="font-size:.9rem">No API keys, no downloads, nothing phoning home.
+      Backpropagation, Adam, PPO, convolutions and attention are all plain JavaScript sitting in
+      this repository, and your laptop fan is what does the training.</p>
     </div>
     <div class="panel">
-      <b>Skip the waiting, or don't</b>
-      <p class="mb0" style="font-size:.9rem">Trained models ship with the site, so the digit
-      recogniser works the instant you open it and the Rocket League run replays as a timelapse you
-      can scrub. One button throws them away for the full from-scratch version.</p>
+      <b>Skip the queue, or don't</b>
+      <p class="mb0" style="font-size:.9rem">Finished models ship with the site, so the digit
+      recogniser works the second the page loads and you can scrub a whole Rocket League run like a
+      video. There's a button on every one of them that throws the finished weights away and starts
+      from noise, if you'd rather sit through it. Plenty of people should.</p>
     </div>
     <div class="panel">
-      <b>Goals, challenges and quizzes</b>
-      <p class="mb0" style="font-size:.9rem">Twenty-nine badges, none for clicking around: they
-      unlock when a model of yours does something — evolves a car that finishes, trains a bot that
-      scores, teaches itself to write words, or answers three questions about what you just watched
-      happen.</p>
+      <b>Badges you have to earn</b>
+      <p class="mb0" style="font-size:.9rem">Twenty-nine of them, and none are for clicking around.
+      They fire when a model of yours actually does the thing: a car that finishes a lap, a bot that
+      scores on an empty net, a transformer that produces a real word. You can't collect them by
+      scrolling.</p>
     </div>
     <div class="panel">
-      <b>You are meant to break it</b>
-      <p class="mb0" style="font-size:.9rem">Every lesson ends with experiments designed to make the
-      model fail in an instructive way — reward hacking, overfitting, dead exploration, learning
-      rates that explode.</p>
+      <b>You're meant to break it</b>
+      <p class="mb0" style="font-size:.9rem">Every lesson ends with a list of ways to sabotage the
+      thing you just built: reward hacking, overfitting, exploration that dies, a learning rate set
+      high enough to blow the whole run apart. Watching a model fail on purpose teaches more than
+      watching it succeed by accident.</p>
     </div>
   </div>
 
   <div class="track-head">
     <h2>The lessons</h2>
-    <span>in order, though each one stands alone</span>
+    <span>in order if you can, but none of them lock</span>
   </div>
   <div id="progress-strip"></div>
   <div class="card-grid" id="lesson-cards"></div>
@@ -79,45 +82,48 @@
   <div class="section">
     <h2>Where to start</h2>
     <p>
-      If you're new to all of this, go in order — the lessons deliberately build on each other. If
-      you came for one thing, jump straight to it:
+      In order is best; each lesson leans on the one before it. But most people arrive wanting one
+      specific thing, so:
     </p>
     <ul>
-      <li><strong>"I want the Rocket League bot."</strong> Go there directly — the timelapse at the
-        top shows the whole training run in half a minute. If the words <em>reward</em>,
-        <em>policy</em> and <em>discount</em> are new, the <a href="lessons/gridworld.html">Q-learning
-        lesson</a> first is twenty well-spent minutes.</li>
+      <li><strong>"I want the Rocket League bot."</strong> Just go. The timelapse near the top
+        replays an entire training run in about thirty seconds, so you'll know within a minute
+        whether you want the rest. If <em>reward</em>, <em>policy</em> and <em>discount</em> are new
+        words, spend twenty minutes in <a href="lessons/gridworld.html">Q-learning</a> first and the
+        whole page will land differently.</li>
       <li><strong>"I just want to play with something."</strong>
-        <a href="lessons/evolve-a-driver.html">Evolve a driver</a> needs no background at all: watch
-        sixty cars fail, then get good, then beat you in a race.</li>
-      <li><strong>"I want to understand vision models."</strong> Convolutions → Train a CNN → Vision
-        Transformers, in that order. The first is arithmetic you do by hand; the last is a real
-        transformer with its attention maps exposed.</li>
-      <li><strong>"I want to understand language models."</strong> Vision Transformers first for the
-        attention mechanism, then <a href="lessons/language.html">Teach a model to write</a>, which is
-        the same block with causal masking and characters instead of patches.</li>
-      <li><strong>"I've never trained anything."</strong> Start with
-        <a href="lessons/foundations.html">Foundations</a>. Everything else is that same loop with
-        more interesting shapes attached.</li>
+        <a href="lessons/evolve-a-driver.html">Evolve a driver</a> assumes nothing. Sixty cars, no
+        teacher, and a track you draw. They're hopeless for about ten generations.</li>
+      <li><strong>"I want to understand vision models."</strong> Convolutions, then Train a CNN,
+        then Vision Transformers. You start by doing the multiplication by hand on a 3×3 grid and
+        finish inside a real transformer with its attention maps pulled open.</li>
+      <li><strong>"I want to understand language models."</strong> Do Vision Transformers first —
+        it's easier to see attention working on a picture than on text. Then
+        <a href="lessons/language.html">Teach a model to write</a> is the identical block with
+        characters swapped in for patches and a mask that stops it reading ahead.</li>
+      <li><strong>"I've never trained anything."</strong>
+        <a href="lessons/foundations.html">Foundations</a>. Every other lesson on this site is that
+        same loop wearing a costume.</li>
     </ul>
   </div>
 
   <div class="section">
     <h2>Running it yourself</h2>
     <p>
-      Every page is static HTML, CSS and JavaScript with no build step and no dependencies. Open
-      <code>index.html</code> straight from disk and it works, or serve the folder if you prefer:
+      Every page is static HTML, CSS and JavaScript. No build step, no dependencies, no
+      <code>node_modules</code>. Double-clicking <code>index.html</code> works, though serving the
+      folder works better (the Rocket League lesson can use a background thread that way):
     </p>
     <pre><code>git clone https://github.com/ZBelohlavek/MachineLearning.git
 cd MachineLearning
 python3 -m http.server 8000     # then open http://localhost:8000</code></pre>
     <p>
-      The machine learning code is deliberately readable and lives in
-      <code>assets/js/lib/</code>: <code>nn.js</code> (dense layers, backpropagation, Adam),
-      <code>cnn.js</code> (convolution, pooling), <code>vit.js</code> (attention, layer norm) and the
-      per-lesson environments under <code>assets/js/lessons/</code>. The backward passes are written
-      out by hand and checked against numerical gradients — if you've only ever called
-      <code>loss.backward()</code>, they're worth a read.
+      The learning code lives in <code>assets/js/lib/</code> and is meant to be read:
+      <code>nn.js</code> has dense layers, backpropagation and Adam, <code>cnn.js</code> has
+      convolution and pooling, <code>vit.js</code> has attention and layer norm. Environments sit
+      under <code>assets/js/lessons/</code>. Every backward pass in there is written out by hand and
+      checked against numerical gradients by <code>tests/gradcheck.cjs</code>. If you've only ever
+      called <code>loss.backward()</code> and taken it on faith, that's the file to open.
     </p>
   </div>
 </div>

@@ -288,11 +288,11 @@
      */
     function trackProblem() {
       if (!track.onRoad(track.start.x, track.start.y)) {
-        return 'The start square is off the road — draw some road under the blue S.';
+        return 'The start square is off the road. Draw some road under the blue S.';
       }
       const si = (track.start.y | 0) * GW + (track.start.x | 0);
       if (track.dist[si] < 0) {
-        return 'There is no route from S to F any more — the road is broken somewhere between them.';
+        return 'There is no route from S to F any more. The road is broken somewhere between them.';
       }
       return '';
     }
@@ -478,7 +478,7 @@
         const throttle = keys.up ? 1 : keys.down ? -0.4 : 0.05;
         player.step(track, [steer, throttle]);
         if (player.finished) {
-          if (rival.finished) raceResult = 'You lost — the champion got there first.';
+          if (rival.finished) raceResult = 'You lost. The champion got there first.';
           else {
             raceResult = 'You win! You beat the evolved driver.';
             achieve('racer-beaten', `You finished in ${raceTime.toFixed(2)}s`);
@@ -491,7 +491,7 @@
         const out = rival.brain.forward(s);
         rival.step(track, [out[0], (out[1] + 1) / 2]);
         if (rival.finished && !player.finished && player.alive) raceResult = 'The champion finished first. Try again.';
-        else if (!rival.alive && !rival.finished && player.alive) raceResult = 'The champion crashed — the race is yours to lose.';
+        else if (!rival.alive && !rival.finished && player.alive) raceResult = 'The champion crashed. The race is yours to lose.';
       }
       updateRaceUI();
     }
@@ -566,7 +566,7 @@
       seed,
       charts: () => [chart],
       onSeed: (v) => { seed = v; rand = mulberry32(seed); newPopulation(); updateStats(0, 0, 0); },
-      note: 'Same seed, same starting population — so a settings change is the only difference.',
+      note: 'Same seed, same starting population, so a settings change is the only difference.',
     });
 
     const btnRun = document.getElementById('btn-run');

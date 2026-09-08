@@ -39,10 +39,10 @@
     <div class="kicker">Reinforcement learning · flagship project</div>
     <h1>Train a self-play Rocket League bot</h1>
     <p class="lead">
-      Nobody will show this agent a single example of a good shot. It starts by twitching at random
-      in an empty arena, and it has to discover — from a number that goes up when the ball moves the
-      right way — how to drive, how to line up, and how to score. You design the reward, you choose
-      the opponent, and you watch it happen frame by frame.
+      Nobody shows this agent a single example of a good shot. It starts out twitching at random in an
+      empty arena, and from one number that ticks up when the ball moves the right way, it has to work out
+      how to drive, how to line up behind the ball, and how to score. You pick the reward. You pick the
+      opponent. Then you watch, frame by frame, and find out what you actually asked for.
     </p>
   </div>
 
@@ -52,17 +52,16 @@
   <div class="section">
     <h2>Why this can't be taught the normal way</h2>
     <p>
-      Most machine learning is <strong>supervised</strong>: you hand the model thousands of examples
-      with the right answer attached, and it learns to copy them. That approach dies here. Nobody can
-      write down the "correct" steering angle for every possible arrangement of car, ball and
-      opponent — and even if they could, the right move often only reveals itself two seconds later,
-      when the ball rolls into the net.
+      Most machine learning is supervised. You hand the model thousands of examples with the right
+      answer stapled on, and it learns to copy them. That doesn't work here. Nobody can write down the
+      correct steering angle for every possible arrangement of car, ball and opponent, and even if you
+      could, the right move usually only looks right two seconds later when the ball rolls in.
     </p>
     <p>
-      <strong>Reinforcement learning</strong> replaces the labelled answer with a much weaker signal:
-      a reward. The agent acts, the world changes, a number comes back. Its job is to work out which
-      of the hundreds of decisions it just made deserve the credit. That's the whole field in one
-      sentence, and everything below is machinery for doing it reliably.
+      So reinforcement learning throws out the labelled answer and replaces it with something much
+      weaker: a reward. The agent acts, the world moves, a number comes back. Its whole job is figuring
+      out which of the several hundred decisions it just made deserve the credit. Everything below is
+      machinery for doing that without the thing falling apart.
     </p>
 
     <svg class="loop-svg" viewBox="0 0 560 190" role="img" aria-label="The reinforcement learning loop: the agent observes a state, takes an action, and the environment returns a reward and a new state.">
@@ -93,10 +92,10 @@
   <div class="section">
     <h2>Step 1 · Drive the car yourself</h2>
     <p>
-      Before you train anything, get a feel for the world the agent lives in. Use
-      <kbd>←</kbd> <kbd>→</kbd> to steer and <kbd>↑</kbd> <kbd>↓</kbd> for throttle and reverse
-      (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> works too). Notice that you can only turn
-      while you're moving — exactly like a real car, and exactly the thing that makes this hard to learn.
+      Before you train anything, drive the thing yourself. Arrow keys to steer and accelerate, WASD if
+      you prefer. The important part: you can only turn while you're moving. That's true of real cars and
+      it's also the single detail that makes this problem hard, because standing still is a trap the agent
+      has to learn its way out of.
     </p>
 
     <div class="split">
@@ -113,8 +112,8 @@
       <div class="panel">
         <div class="panel-title"><h3>Reward, right now</h3></div>
         <p class="muted" style="font-size:.84rem">
-          Every term below is being computed for the car you're driving, every single tick.
-          Green is positive, red is negative. This is the entire feedback the agent will ever get.
+          Every term below is being computed live for the car you're driving. Green is positive, red is
+          negative. This is the entire feedback signal the agent will ever receive about anything.
         </p>
         <div id="reward-bars"></div>
         <div style="margin-top:10px;font-size:.85rem" class="muted">
@@ -130,23 +129,30 @@
       </div>
       <canvas id="obs-canvas" class="fit" role="img" aria-label="The 24 numbers the agent receives as its observation, updated live."></canvas>
       <p style="margin-top:12px">
-        There are no pixels here. The policy never sees the picture above — it sees these 24 numbers,
-        and nothing else. Two design decisions in this list do most of the heavy lifting:
+        There are no pixels in any of this. The policy never sees the arena above. It sees these 24
+        numbers and nothing else, thirty times a second. Two decisions in this list are doing most of the
+        work:
       </p>
       <ul>
-        <li><strong>It's egocentric.</strong> "ball ahead" and "ball left" are measured in the car's own
-          frame, not the field's. A situation that looks the same from the driver's seat produces the
-          same numbers wherever on the pitch it happens, so a lesson learned in one corner transfers to
-          the other three.</li>
-        <li><strong>It's side-agnostic.</strong> Orange's world is rotated 180° before it hits the
-          network, so both cars believe they are attacking the right-hand goal. That's what lets a
-          <em>single</em> network play both sides of a self-play match.</li>
+        <li>
+          <b>It's egocentric.</b> "Ball ahead" and "ball left" are measured from the driver's seat, not from
+          the field. A situation that looks the same to the car produces the same numbers no matter where on
+          the pitch it happens, so something learned in one corner shows up in the other three for free.
+        </li>
+        <li>
+          <b>It's side-agnostic.</b> Orange's whole world gets rotated 180° before it reaches the network,
+          so both cars are convinced they're attacking the right-hand goal. That's the trick that lets one
+          network play both sides of a self-play match.
+        </li>
       </ul>
       <div class="note">
         <b class="label">Observation design is where most RL projects are won or lost</b>
-        <p class="mb0">Feed the network raw absolute coordinates and it has to learn the same skill four
-        times over. Feed it the right relative quantities and it can generalise from a fraction of the
-        experience. Nothing in the algorithm below can rescue a bad observation.</p>
+        <p class="mb0">
+          Feed the network raw field coordinates instead and it has to learn the same skill four separate
+          times, once per corner. Feed it the right relative quantities and one lesson covers all four. No
+          amount of clever algorithm further down can rescue a badly chosen observation, which is a thing I
+          wish someone had told me earlier.
+        </p>
       </div>
     </div>
   </div>
@@ -155,15 +161,15 @@
   <div class="section">
     <h2>Step 2 · Design the reward</h2>
     <p>
-      Here's the uncomfortable truth about reinforcement learning: the agent does not do what you want.
-      It does what you <em>reward</em>. Those are the same thing only if you were extremely careful.
+      Here's the part that catches everyone. The agent does not do what you want. It does what you pay
+      it for. Those are the same thing only if you were unusually careful, and you probably weren't.
     </p>
     <p>
-      Scoring is the real objective, but a goal happens maybe once in three hundred decisions, and only
-      after a long chain of them went right. Learning from that signal alone is possible but slow — try
-      the "Goals only" preset later and watch it flounder. So we add <strong>shaping</strong> terms:
-      small, dense hints that point in roughly the right direction. Shaping is how you get an agent off
-      the ground, and it is also how you accidentally teach it something ridiculous.
+      Scoring is the actual objective, but a goal turns up maybe once in three hundred decisions, and
+      only after a long chain of them went right. You can learn from that alone. It's just extremely slow,
+      and you can watch it be slow later with the "Goals only" preset. So we add shaping terms: small,
+      constant hints pointing roughly the right way. Shaping is how you get an agent off the ground. It's
+      also how you teach it something ridiculous without noticing.
     </p>
 
     <div class="split wide-right">
@@ -172,10 +178,11 @@
         <div id="reward-presets"></div>
         <div style="margin-top:16px" class="note warn">
           <b class="label">Try to break it</b>
-          <p class="mb0">Set <code>approach</code> high and <code>push</code> to zero, then train.
-          You'll get an agent that adores the ball and follows it lovingly around the pitch without
-          ever putting it in the net. That is <em>reward hacking</em>: it found the maximum of the
-          function you actually wrote instead of the one you meant.</p>
+          <p class="mb0">
+            Try it. Set approach high, push to zero, and train. You'll get an agent that adores the ball and
+            follows it lovingly around the pitch for the entire episode without ever putting it in the net. It
+            found the maximum of the function you wrote. You just wrote the wrong function.
+          </p>
         </div>
       </div>
       <div class="panel">
@@ -192,12 +199,11 @@
   <div class="section">
     <h2>Step 3 · Watch three thousand episodes in thirty seconds</h2>
     <p>
-      Training an agent from scratch takes a few minutes of real time, and the first minute of it is
-      a car spinning in circles. So here are two prepared earlier: checkpoints saved at intervals
-      through two full training runs, which you can scrub through like a video. Every one is the real
-      policy from that moment — the same network, playing live, with the weights it had after that
-      many episodes. One run was trained on a sensible reward. The other was trained on a broken one,
-      and is worth at least as much of your attention.
+      Training one of these from scratch takes a few minutes, and the first of those minutes is a car
+      doing donuts. So here are two I trained earlier: checkpoints saved at intervals through two complete
+      runs, which you can scrub like video. Nothing here is faked. Each frame is the real policy from that
+      moment, playing live, with the weights it actually had after that many episodes. One run got a
+      sensible reward. The other got a broken one, and it's the more interesting of the two.
     </p>
 
     <div class="split">
@@ -241,31 +247,37 @@
         <canvas id="stage-chart" class="fit" role="img" aria-label="Recorded goal rate across the pre-trained run."></canvas>
         <canvas id="stage-chart2" class="fit" style="margin-top:10px" role="img" aria-label="Recorded ball touches per episode across the pre-trained run."></canvas>
         <p class="muted" style="font-size:.84rem;margin-top:12px">
-          The dashed line marks where you are. Notice the shape: almost nothing happens for hundreds
-          of episodes, then touches climb, and only after that do goals follow. Learning is not
-          gradual here — it is a sequence of skills unlocking in order, each one built on the last.
+          The dashed line marks where you are in the run. Look at the shape of it: almost nothing for
+          hundreds of episodes, then touches climb, and only well after that do goals start. Progress isn't a
+          smooth ramp. It's a set of skills unlocking in order, each one sitting on top of the last, which is
+          why a run that looks dead for two minutes can suddenly take off.
         </p>
         <div class="note" style="margin-top:14px">
           <b class="label">Watch the failure modes go by</b>
-          <p class="mb0">Early stages are worth watching for longer than they deserve. There's a
-          period where the agent drives at the ball and pushes it <em>anywhere</em>, including into
-          its own net — the shaping reward for touching the ball is being collected, and the goal
-          reward hasn't outweighed it yet. That's an agent optimising exactly what you asked for.</p>
+          <p class="mb0">
+            Sit on the early stages longer than they seem to deserve. There's a stretch where the agent
+            drives straight at the ball and shoves it wherever, including into its own net, over and over. It's
+            collecting the touch reward, and the goal reward hasn't grown big enough to argue yet. It's doing
+            precisely what you asked.
+          </p>
         </div>
 
         <div class="note warn" style="margin-top:14px">
           <b class="label">The second run is the same algorithm with a broken reward</b>
-          <p>Switch the panel to <b>Side by side</b>. Both agents had twelve thousand episodes, the
-          same network, the same physics and the same PPO code. The only difference is the reward:
-          the one on the right was paid generously for <em>touching</em> and <em>approaching</em> the
-          ball, and almost nothing for scoring.</p>
-          <p class="mb0">It ends the run scoring in <b>0 of 30</b> empty-net attempts, against 19 of
-          20 for the well-shaped agent. And the way it fails is the interesting part — measured over
-          30 episodes it sits <b>3.4× closer</b> to the ball (mean distance 17 units against 58) while
-          touching it <b>13× less often</b> (0.2 touches an episode against 2.6). It learned to shadow
-          the ball without ever hitting it, because hitting the ball pushes it away, and being close
-          to the ball was what you paid for. Nobody wrote "hover near the ball" anywhere. It is the
-          exact maximum of the function that was actually specified.</p>
+          <p>
+            Now switch the panel to Side by side. Both of these agents got twelve thousand episodes, the same
+            network, the same physics, the same PPO code. The only thing I changed was the reward: the one on
+            the right was paid generously for touching and approaching the ball, and next to nothing for
+            scoring.
+          </p>
+          <p class="mb0">
+            It finishes the run scoring in 0 of 30 empty-net attempts. The well-shaped agent gets 19 of 20.
+            What I didn't expect was <em>how</em> it fails. Measured over 30 episodes it sits 3.4× closer to the
+            ball than the good agent (mean distance 17 units against 58) while touching it 13× less often (0.2
+            touches per episode against 2.6). It learned to stalk the ball and never make contact, because
+            contact pushes the ball away, and proximity was what I was paying for. Nobody wrote "hover near the
+            ball" anywhere in the reward. It's just the maximum of what I actually specified.
+          </p>
         </div>
       </div>
     </div>
@@ -275,35 +287,40 @@
   <div class="section">
     <h2>Step 4 · How the learning actually works</h2>
     <p>
-      The agent is a small neural network: 24 inputs, two hidden layers of 64 units, and 9 outputs —
-      one score per action (three throttle settings × three steering settings). Softmax turns those
-      scores into probabilities, and the agent rolls a die. Randomness is not a flaw here; it is the
-      only way it ever discovers anything.
+      The agent is a small network: 24 inputs, two hidden layers of 64 units, 9 outputs. One score per
+      action, from three throttle settings crossed with three steering settings. Softmax turns the scores
+      into probabilities and the agent rolls dice. That randomness isn't sloppiness, it's the only reason
+      it ever finds anything new.
     </p>
     <p>
-      Training uses <strong>PPO</strong> (Proximal Policy Optimisation), the same family of algorithm
-      behind most of the game-playing agents you've read about. Each round of training does three things:
+      Training uses PPO, which stands for Proximal Policy Optimisation and is the algorithm behind most
+      of the game-playing agents you've read about. Each round does three things:
     </p>
     <ol class="phase-list">
-      <li><strong>Play.</strong> Run a batch of episodes with the current policy, recording every state,
-        the action taken, and the probability the policy assigned to it at the time.</li>
-      <li><strong>Judge.</strong> A second network — the <em>critic</em> — predicts how much total future
-        reward each state was worth. Subtracting its prediction from what actually happened gives the
-        <strong>advantage</strong>: not "was this good?" but "was this better than expected?" That
-        distinction is what makes the signal usable. Winning from a great position teaches nothing;
-        winning from a hopeless one teaches a lot.</li>
-      <li><strong>Improve.</strong> Nudge the network to make positive-advantage actions more likely —
-        but <em>clip</em> the change, so a single noisy batch can never yank the policy somewhere
-        it can't recover from. That clip is the "proximal" in PPO, and it's the difference between
-        training that converges and training that explodes.</li>
+      <li>
+        <b>Play.</b> Run a batch of episodes on the current policy, recording every state, the action
+        taken, and how likely the policy thought that action was at the time.
+      </li>
+      <li>
+        <b>Judge.</b> A second network, the critic, guesses how much future reward each state was worth.
+        Subtract its guess from what really happened and you get the advantage, which answers "was that
+        better than expected?" rather than "was that good?". Winning from a winning position teaches almost
+        nothing. Scraping a win from a hopeless one teaches a lot.
+      </li>
+      <li>
+        <b>Improve.</b> Push the network toward the actions that beat expectations, then clip how far it's
+        allowed to move, so one unlucky batch can't fling the policy somewhere it'll never come back from.
+        The clip is the "proximal" part, and it's most of the reason this trains at all.
+      </li>
     </ol>
     <div class="note">
       <b class="label">Everything is running on this page</b>
-      <p class="mb0">The arena physics, both networks, backpropagation, Adam, GAE and the PPO update
-      come to roughly a thousand lines of plain JavaScript across
-      <code>assets/js/lessons/rocket-env.js</code>, <code>rocket-train.js</code> and
-      <code>assets/js/lib/nn.js</code>. There is no server and no pre-trained model: when you hit
-      start, your laptop is doing the learning.</p>
+      <p class="mb0">
+        The arena physics, both networks, backpropagation, Adam, GAE and the PPO update come to about a
+        thousand lines of ordinary JavaScript spread across <code>rocket-env.js</code>,
+        <code>rocket-train.js</code> and <code>nn.js</code>. No server, no pretrained anything. When you
+        press start below, the learning is happening on your machine.
+      </p>
     </div>
   </div>
 
@@ -311,29 +328,39 @@
   <div class="section">
     <h2>Step 5 · Train it yourself</h2>
     <p>
-      Now do it for real. Press start and leave it running: this is your machine, from random
-      weights, with no help. Below is what to look for, roughly in the order it happens — expect the
-      first two phases within a minute or so on a modern laptop. (In a hurry, or want a strong
-      opponent to play against? "Load trained agent" drops the finished policy straight in.)
+      Now do it for real. Press start and then leave it alone: this is your machine, from random
+      weights, with no help from me. Here's roughly what happens and in what order. The first two phases
+      usually show up inside a minute on a modern laptop. (If you'd rather skip ahead, or you want a
+      decent opponent to play against, "Load trained agent" drops a finished policy straight in.)
     </p>
     <ul class="phase-list">
-      <li><strong>Twitching (0–30s).</strong> Actions are near-uniform noise, the car spins on the
-        spot, and entropy sits near its maximum of 2.20 (that's ln 9, a policy with no opinion at
-        all). Reward hovers around zero.</li>
-      <li><strong>Ball attraction (30s–2min).</strong> "Touches per episode" lifts off the floor and
-        the reward curve turns upward. The approach and touch terms are the cheapest reward on offer,
-        so they get collected first — this is reward shaping doing its job.</li>
-      <li><strong>Direction (2–4min).</strong> Touches start turning into shots and entropy falls
-        below about 1.0 as the policy commits to habits. On a recent run this page reached 74% of
-        episodes ending in a goal after three minutes, and beat the scripted bot 8–6.</li>
-      <li><strong>The curriculum bites.</strong> Watch the "difficulty" stat. It starts at 30% — the
-        ball spawns close by — and only widens once the agent reliably finds it. When it reaches
-        100%, touches per episode usually <em>drop</em> for a while: the problem just got harder, not
-        the agent worse. A metric falling because the task changed underneath it is one of the most
-        common ways to misread a training run.</li>
-      <li><strong>Positioning (5min+).</strong> The agent starts approaching from the correct side
-        instead of nudging the ball wherever it happens to be facing — the first behaviour that looks
-        genuinely deliberate rather than merely eager.</li>
+      <li>
+        <b>Twitching (0–30s).</b> Actions are close to uniform noise, the car spins on the spot, and
+        entropy sits near its ceiling of 2.20, which is ln 9: a policy with no opinion whatsoever. Reward
+        hovers around nothing.
+      </li>
+      <li>
+        <b>Ball attraction (30s–2min).</b> Touches per episode lift off the floor and the reward curve
+        turns upward. Approach and touch are the cheapest reward available, so they get collected first.
+        This is shaping doing its job.
+      </li>
+      <li>
+        <b>Direction (2–4min).</b> Touches start becoming shots, and entropy drops under about 1.0 as the
+        policy settles into habits. On one run of this page I got 74% of episodes ending in a goal after
+        three minutes, and it beat the scripted bot 8–6.
+      </li>
+      <li>
+        <b>The curriculum bites.</b> Keep an eye on the difficulty stat. It opens at 30%, with the ball
+        spawning nearby, and only widens once the agent can reliably find it. The moment it hits 100%,
+        touches per episode usually fall for a while. The agent didn't get worse; the exam got harder. A
+        metric dropping because the task changed underneath it is one of the easiest ways to misread a
+        training run, and I've fooled myself with it more than once.
+      </li>
+      <li>
+        <b>Positioning (5min+).</b> The agent starts coming at the ball from the correct side rather than
+        poking it wherever it happens to be pointing. This is the first behaviour that looks deliberate
+        instead of merely enthusiastic.
+      </li>
     </ul>
 
     <div class="split">
@@ -377,9 +404,9 @@
           <canvas id="chart-learn" class="fit" style="margin-top:10px" role="img" aria-label="Chart of policy entropy and policy change over training."></canvas>
         </div>
         <p class="muted" style="font-size:.8rem;margin-top:10px">
-          Reward per episode is the number being optimised, but it is not the score you care about —
-          change the weights and it changes meaning. <em>Episodes ending in a goal</em> and the
-          Evaluate button are the honest measures.
+          Reward per episode is the number being optimised, but don't mistake it for a score. Change the
+          weights and it changes meaning, so two runs with different rewards can't be compared on it at all.
+          Episodes ending in a goal, and the Evaluate button, are the honest measures.
         </p>
       </div>
     </div>
@@ -394,12 +421,14 @@
 
     <div class="note warn" style="margin-top:18px">
       <b class="label">Self-play has a trap in it</b>
-      <p class="mb0">When both cars share one brain, "goals scored" is always about equal to
-      "goals conceded" — the agent is playing itself, so the net score is meaningless no matter how
-      good it gets. Worse, two agents can drift into a stable, mutually terrible equilibrium and never
-      leave. That's why the opponent selector offers a <em>frozen past self</em> (a snapshot from
-      several updates ago) and a fixed scripted bot: an opponent that doesn't move with you is the
-      only way to know you're improving.</p>
+      <p class="mb0">
+        When both cars share a brain, goals scored always roughly equals goals conceded. The agent is
+        playing itself, so the net score tells you nothing no matter how good it gets. Worse, two copies can
+        settle into a stable, mutually awful equilibrium and sit there happily forever. That's why the
+        opponent selector offers a frozen past self (a snapshot from several updates back) and a fixed
+        scripted bot. An opponent that doesn't improve alongside you is the only way to know you're
+        improving.
+      </p>
     </div>
   </div>
 
@@ -407,10 +436,10 @@
   <div class="section">
     <h2>Step 6 · Look inside the policy</h2>
     <p>
-      This is the same network from the match above, drawn live. The left column is the observation,
-      the middle two are the hidden layers, and the right is the raw action scores. Blue is negative,
-      red is positive. Watch it as the ball approaches: whole regions of the hidden layers switch
-      character as the situation changes.
+      This is the same network playing the match above, drawn live. Left column is the observation, the
+      middle two are the hidden layers, the right is the raw action scores. Blue is negative, red is
+      positive. Watch it while the ball comes in: whole regions of the hidden layers flip character as the
+      situation changes.
     </p>
     <div class="split">
       <div class="panel">
@@ -422,9 +451,9 @@
         <div class="panel-title"><h3>What it wants to do</h3></div>
         <div id="action-grid" class="act-grid"></div>
         <p class="muted" style="font-size:.82rem;margin-top:12px">
-          Early in training these nine bars are all about 11% — the agent is guessing. As it learns,
-          the distribution sharpens. If they collapse to a single 100% bar too early, the agent has
-          stopped exploring: raise the entropy bonus and reset.
+          Early on these nine bars all sit near 11% and the agent is guessing. They sharpen as it learns.
+          If they collapse onto a single 100% bar in the first minute, exploration has died: raise the entropy
+          bonus and start again.
         </p>
       </div>
     </div>
@@ -434,17 +463,17 @@
   <div class="section">
     <h2>Step 7 · Take it on yourself</h2>
     <p>
-      Switch the match to <em>You vs agent</em> and drive the orange car with the arrow keys. Playing
-      against your own agent tells you things no chart will: whether it defends, whether it panics
-      near its own goal, whether it can be walked around the same way twice.
+      Switch the match to You vs agent and take the orange car. Playing your own agent tells you things
+      no chart will. Whether it bothers defending. Whether it panics near its own goal. Whether you can
+      walk around it the same way twice, which you usually can.
     </p>
     <div class="panel">
       <div class="panel-title"><h3>Match settings</h3><span class="hint">applies to the arena in Step 5</span></div>
       <div id="play-mode"></div>
       <div id="match-pad"></div>
       <p class="muted" style="font-size:.82rem;margin-top:12px">
-        Greedy mode removes the randomness and always plays the top-scoring action — that's how you'd
-        ship an agent. Leave it off during training: the exploration is what's producing the learning.
+        Greedy mode drops the dice and always plays the top-scoring action, which is how you'd ship one of
+        these. Leave it off while training. The randomness is what's generating the learning.
       </p>
     </div>
   </div>
@@ -453,30 +482,42 @@
   <div class="section">
     <h2>Experiments worth running</h2>
     <ul>
-      <li><strong>Kill the shaping.</strong> Load the "Goals only" preset and reset. With a reward that
-        arrives once every few hundred steps, progress nearly stops. This is the sparse-reward problem,
-        and it's why so much RL research is really about exploration.</li>
-      <li><strong>Turn the curriculum off.</strong> The agent then starts every episode with a full
-        random kickoff instead of near the ball. Compare how long the first touches take to appear.</li>
-      <li><strong>Set the entropy bonus to zero.</strong> Sometimes it's fine. Sometimes the policy
-        locks onto "always turn left" in the first minute and never escapes, because it stopped
-        sampling anything else long enough to find out there was better.</li>
-      <li><strong>Push the discount γ down to 0.85.</strong> The agent becomes short-sighted: it will
-        take a touch now over a goal in two seconds, because two seconds of discounting has made the
-        goal nearly worthless.</li>
-      <li><strong>Crank the learning rate to 0.02.</strong> Watch the reward curve spike and then fall
-        apart. Then look at the PPO clip slider and try to work out why it doesn't fall apart
-        <em>immediately</em>.</li>
-      <li><strong>Train against the scripted bot instead of self-play.</strong> You'll get an agent that
-        beats that specific bot and is oddly bad against you. Overfitting isn't only a supervised problem.</li>
+      <li>
+        <b>Kill the shaping.</b> Load "Goals only" and reset. With reward arriving once every few hundred
+        steps, progress more or less stops. This is the sparse-reward problem, and it's why a surprising
+        amount of RL research is really research about exploration.
+      </li>
+      <li>
+        <b>Turn the curriculum off.</b> Every episode now starts with a full random kickoff instead of a
+        gift-wrapped ball. Time how long the first touches take to appear compared with before.
+      </li>
+      <li>
+        <b>Set the entropy bonus to zero.</b> Sometimes nothing bad happens. Sometimes the policy decides
+        in the first minute that the answer is "always turn left" and never finds out otherwise, because it
+        stopped sampling anything else long enough to check.
+      </li>
+      <li>
+        <b>Push the discount γ down to 0.85.</b> The agent goes short-sighted and takes a touch now over a
+        goal two seconds from now, because two seconds of discounting has made the goal nearly worthless to
+        it.
+      </li>
+      <li>
+        <b>Crank the learning rate to 0.02.</b> Watch the reward curve spike and then come apart. Then go
+        look at the PPO clip slider and work out why it took as long to fall apart as it did.
+      </li>
+      <li>
+        <b>Train against the scripted bot instead of self-play.</b> You'll end up with an agent that
+        handles that one bot nicely and is strangely bad against you. Overfitting isn't only a supervised
+        problem.
+      </li>
     </ul>
   </div>
 
   <div class="section">
     <h2>Check yourself</h2>
     <p>
-      Three questions on what you just made happen. They are not a test you can fail — the
-      explanation appears either way, and the wrong answers are the ones worth reading.
+      Three questions about the agent you just trained. You can't fail this — the explanation shows up
+      either way, and honestly the wrong answers are the ones worth reading.
     </p>
     <div class="panel" id="quiz"></div>
   </div>

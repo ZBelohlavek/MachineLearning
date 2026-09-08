@@ -420,7 +420,7 @@
        ================================================================== */
     const rewardPanel = document.getElementById('reward-sliders');
     const REWARD_META = [
-      ['goal', 0, 20, 'Scoring. The only thing that truly matters — and the hardest signal to learn from, because it arrives once every few hundred steps.'],
+      ['goal', 0, 20, 'Scoring. The only thing that really matters, and the hardest signal to learn from, because it turns up once every few hundred steps.'],
       ['push', 0, 3, 'Reward for moving the ball toward the opponent goal (and punishment for the reverse). The single most useful shaping term.'],
       ['touch', 0, 2, 'A bonus every time the car makes contact with the ball.'],
       ['approach', 0, 2, 'Reward for closing distance to the ball. Gets a beginner agent moving, but can teach it to hug the ball instead of scoring.'],
@@ -744,7 +744,7 @@
       if (!el) return;
       el.innerHTML = workerReady
         ? 'Training is running on a background thread, so the arena stays at a steady 60fps.'
-        : 'Training is sharing this page\'s thread, so the arena will stutter while it runs — ' +
+        : 'Training is sharing this page\'s thread, so the arena will stutter while it runs. ' +
           'browsers block workers on <code>file://</code>. Serving the folder over http fixes it.';
     }
 

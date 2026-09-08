@@ -26,10 +26,10 @@
     <div class="kicker">Reinforcement learning · a game you can win</div>
     <h1>Evolve a driver from scratch</h1>
     <p class="lead">
-      No gradients. No backpropagation. No teacher, no labels and no reward function to tune. Sixty
-      cars with random brains drive into a wall, the handful that got furthest have their brains
-      copied with small random changes, and the whole thing repeats. Within a couple of minutes
-      something is driving the track properly — and then you can race it.
+      No gradients. No backpropagation. No teacher, no labels, no reward function to agonise over. Sixty
+      cars with random brains drive into a wall; the handful that got furthest have their brains copied
+      with small random changes; repeat. Give it a couple of minutes and something is driving the track
+      properly. Then you can race it.
     </p>
   </div>
 
@@ -46,18 +46,18 @@
       <li>Go back to step 2.</li>
     </ol>
     <p>
-      That's <strong>neuroevolution</strong>, and the striking thing is what it doesn't need. There's
-      no derivative anywhere — the network is never told which weight to change or in which
-      direction. Selection does all the work: bad brains stop reproducing.
+      That's <strong>neuroevolution</strong>, and the striking part is what it never needs. There's no
+      derivative anywhere in it. The network is never told which weight to change or which way to move it.
+      Selection does all of the work, purely by letting bad brains stop reproducing.
     </p>
   </div>
 
   <div class="section">
     <h2>Watch it happen</h2>
     <p>
-      Purple cars are the population, green is the current leader with its sensors drawn, and grey
-      ones have crashed. The road is tinted by distance to the finish, so you can see the goal the
-      cars are unknowingly climbing toward. Generation one is a massacre. Give it twenty.
+      Purple cars are the population, green is the current leader with its sensors drawn, grey ones have
+      crashed. The road is tinted by distance to the finish, so you can see the goal the cars are
+      unknowingly climbing toward. Generation one is a massacre. Give it twenty.
     </p>
 
     <div class="split">
@@ -97,9 +97,9 @@
         <div id="run-bar"></div>
         <canvas id="racer-chart" class="fit" style="margin-top:14px" role="img" aria-label="Chart of best and average car progress per generation."></canvas>
         <p class="muted" style="font-size:.82rem;margin-top:10px">
-          The green line is the best car in each generation, purple is the population average. The
-          gap between them <em>is</em> the selection pressure: the best are pulling ahead of the
-          crowd, and next generation the crowd is rebuilt from them.
+          The green line is the best car in each generation, purple is the population average. The gap
+          between them is selection pressure: the best are pulling away from the crowd, and next generation the
+          crowd gets rebuilt out of them.
         </p>
       </div>
     </div>
@@ -116,23 +116,25 @@
   <div class="section">
     <h2>What each car can actually perceive</h2>
     <p>
-      Seven whisker sensors, each reporting how far the road continues in that direction, plus its
-      own speed. Eight numbers in, two out: how hard to turn and how hard to accelerate. The brain
-      between them is about ninety weights — smaller than a paragraph of text.
+      Seven whisker sensors, each reporting how far the road carries on in that direction, plus its own
+      speed. Eight numbers in, two out: how hard to turn and how hard to accelerate. The brain in between
+      is about ninety weights, which is smaller than this paragraph.
     </p>
     <p>
-      That is a brutally limited view of the world. The car cannot see the track layout, does not
-      know where the finish is, has no memory of the last corner, and has never been told what a
-      wall is. Everything it appears to know about racing is encoded in ninety numbers that were
-      selected, not designed.
+      That's a brutally limited view of the world. The car can't see the track layout, doesn't know
+      where the finish is, has no memory of the corner it just took, and has never been told what a wall
+      is. Everything it appears to know about racing lives in ninety numbers that were selected rather
+      than designed.
     </p>
     <div class="note">
       <b class="label">Fitness is reward shaping wearing a different hat</b>
-      <p class="mb0">The score here is "distance covered toward the finish, with a bonus for getting
-      there quickly". Every problem from the Rocket League lesson comes straight back: score only
-      the finish and nothing ever finishes; score raw distance travelled and cars learn to drive in
-      circles forever; score speed alone and they sprint into the first wall. The name changes from
-      <em>reward function</em> to <em>fitness function</em>; the difficulty does not.</p>
+      <p class="mb0">
+        The score here is "distance covered toward the finish, with a bonus for getting there quickly".
+        Every problem from the Rocket League lesson walks straight back in. Score only the finish and nothing
+        ever finishes. Score raw distance travelled and the cars learn to drive in circles forever. Score
+        speed alone and they sprint into the first wall at full throttle. The name changes from reward
+        function to fitness function. The difficulty doesn't.
+      </p>
     </div>
   </div>
 
@@ -142,63 +144,87 @@
       <div class="col">
         <h4 style="color:var(--good)">Evolution (this page)</h4>
         <ul>
-          <li>Needs no gradient, so the score can be anything at all — including "did it finish",
-            which is not differentiable.</li>
+          <li>
+            Needs no gradient, so the score can be literally anything, including "did it finish", which isn't
+            differentiable and never will be.
+          </li>
           <li>Trivially parallel: every car is independent.</li>
-          <li>Barely any maths to get wrong. This lesson's algorithm is about forty lines.</li>
-          <li>Scales badly with parameter count. Ninety weights, fine. Ninety million, hopeless.</li>
+          <li>
+            Barely any maths to get wrong. The algorithm on this page is about forty lines.
+          </li>
+          <li>
+            Scales badly with parameter count. Ninety weights is fine. Ninety million is hopeless.
+          </li>
         </ul>
       </div>
       <div class="mid">vs</div>
       <div class="col">
         <h4 style="color:var(--accent)">Policy gradients (Rocket League)</h4>
         <ul>
-          <li>Uses every step of every episode, not just the final score, so it learns from far less
-            experience.</li>
-          <li>Follows a derivative, so it scales to networks with billions of weights.</li>
-          <li>Needs a differentiable objective and careful tuning — clipping, advantages, entropy.</li>
+          <li>
+            Uses every step of every episode instead of just the final score, so it squeezes far more out of
+            the same experience.
+          </li>
+          <li>
+            Follows a derivative, so it scales to networks with billions of weights.
+          </li>
+          <li>
+            Needs a differentiable objective and a lot of careful tuning: clipping, advantages, entropy.
+          </li>
           <li>Many more ways to fail silently.</li>
         </ul>
       </div>
     </div>
     <p class="big-note">
-      The rule of thumb: <strong>few parameters and a messy objective favours evolution; many
-      parameters and a dense signal favours gradients.</strong> Both are on this site precisely so
-      you can feel the difference — this page learns a driver from a score at the end of each life,
-      while the Rocket League agent learns from a number arriving thirty times a second.
+      Rule of thumb: few parameters and a messy objective favours evolution, many parameters and a dense
+      signal favours gradients. Both are on this site so you can feel the difference rather than read about
+      it. This page learns a driver from one score at the end of each life. The Rocket League agent learns
+      from a number arriving thirty times a second.
     </p>
   </div>
 
   <div class="section">
     <h2>Experiments worth running</h2>
     <ul>
-      <li><strong>Set mutation to 0.01, then 0.5.</strong> Tiny mutations mean the population
-        improves smoothly and then stops — it can't reach anything far from where it started. Huge
-        mutations destroy good drivers as fast as they appear, and the best-car line saws up and
-        down. Somewhere in between is where evolution actually works.</li>
-      <li><strong>Set survivors to 2%.</strong> Only the single best car breeds, so the entire
-        population becomes near-copies of one driver. It converges fast, and then can't adapt when
-        you change the track — the diversity that made progress possible is gone.</li>
-      <li><strong>Draw a new corner while it's running.</strong> Turn on the brush, add a hairpin,
-        and watch the champions crash into the change. Their driving isn't general skill, it's a
-        habit that fit one specific track.</li>
-      <li><strong>Shrink the population to 10.</strong> Each generation is much faster but samples
-        far less of the space, so progress per generation collapses. Population size is a
-        compute-versus-exploration trade, and it's the same trade as batch size in the other lessons.</li>
-      <li><strong>Evolve on the Circuit, then switch to the Grand tour without restarting.</strong>
-        Watch how much of the skill survives. Transfer is a genuine research problem, and this is
-        the cheapest demonstration of it you'll ever run.</li>
-      <li><strong>Race the champion, and lose.</strong> Then look at how it does it: it barely
-        steers on straights and turns hard exactly at the apex, because everything else got selected
-        out. It isn't driving well — it's driving in the only way that survived.</li>
+      <li>
+        <b>Set mutation to 0.01, then 0.5.</b> Tiny mutations mean the population improves smoothly and
+        then simply stops, unable to reach anything far from where it started. Huge mutations destroy good
+        drivers as fast as they turn up, and the best-car line saws up and down. The useful range is
+        somewhere in between and it's narrower than you'd like.
+      </li>
+      <li>
+        <b>Set survivors to 2%.</b> Only the single best car breeds, so the whole population turns into
+        near-copies of one driver. It converges fast and then can't adapt when you change the track, because
+        the diversity that made progress possible has been bred out.
+      </li>
+      <li>
+        <b>Draw a new corner while it's running.</b> Turn on the brush, add a hairpin, and watch the
+        champions plough straight into it. Their driving was never general skill. It was a habit that fit one
+        specific track.
+      </li>
+      <li>
+        <b>Shrink the population to 10.</b> Each generation runs much faster but samples far less of the
+        space, so progress per generation collapses. Population size is a compute-versus-exploration trade,
+        and it's the same trade as batch size back in the other lessons.
+      </li>
+      <li>
+        <b>Evolve on the Circuit, then switch to the Grand tour without restarting.</b> Watch how much of
+        the skill survives the move. Transfer is a real research problem, and this is the cheapest
+        demonstration of it you'll ever run.
+      </li>
+      <li>
+        <b>Race the champion, and lose.</b> Then watch how it does it: barely steering on the straights,
+        turning hard exactly at the apex, because everything else got selected out generations ago. It isn't
+        driving well. It's driving in the only way that survived.
+      </li>
     </ul>
   </div>
 
   <div class="section">
     <h2>Check yourself</h2>
     <p>
-      Three questions on what you just made happen. They are not a test you can fail — the
-      explanation appears either way, and the wrong answers are the ones worth reading.
+      Three questions on the population you just evolved. You can't fail this — the explanation appears
+      either way, and the wrong answers are the ones worth reading.
     </p>
     <div class="panel" id="quiz"></div>
   </div>

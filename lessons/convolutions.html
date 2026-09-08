@@ -46,9 +46,9 @@
     <h1>How a computer sees an edge</h1>
     <p class="lead">
       A vision model doesn't see a cat. It sees a grid of brightness numbers. Everything it eventually
-      knows is built out of one absurdly simple operation repeated millions of times: multiply a small
-      patch of those numbers by a small grid of weights and add them up. Do it here, one pixel at a
-      time, and the rest of computer vision stops being mysterious.
+      knows is built out of one almost embarrassingly simple operation, repeated millions of times:
+      multiply a small patch of those numbers by a small grid of weights, and add them up. Do it by hand
+      here, one pixel at a time, and most of the mystery drains out of computer vision.
     </p>
   </div>
 
@@ -57,25 +57,25 @@
   <div class="section">
     <h2>The operation</h2>
     <p>
-      Take a 3×3 window of the image. Take a 3×3 grid of weights — the <strong>kernel</strong>.
-      Multiply them together element by element, add up the nine results, and write that single number
-      into the output image at the window's centre. Slide the window one pixel across and repeat, for
-      every pixel in the image. That's a convolution. There is nothing else to it.
+      Take a 3×3 window of the image. Take a 3×3 grid of weights, which is called the kernel. Multiply
+      them element by element, add up the nine results, and write that one number into the output at the
+      window's centre. Slide across one pixel and do it again, for every pixel in the image. That's a
+      convolution. There genuinely isn't any more to it.
     </p>
     <p>
-      The magic is entirely in the weights. A kernel with <code>−1</code> on the left and
-      <code>+1</code> on the right computes "how much brighter is the right side than the left?" —
-      which is zero everywhere the image is flat, and large exactly where a vertical edge is. You
-      didn't program an edge detector; you wrote down six numbers and an edge detector fell out.
+      All the magic sits in the weights. A kernel with −1 down the left and +1 down the right computes
+      "how much brighter is the right side than the left?", which is zero everywhere the image is flat and
+      large exactly where a vertical edge is. You didn't program an edge detector. You wrote down six
+      numbers and an edge detector fell out.
     </p>
   </div>
 
   <div class="section">
     <h2>Do it by hand</h2>
     <p>
-      Click anywhere on the input to put the window there, or press scan and watch it sweep. The panel
-      on the right shows all nine multiplications for the window's current position and the single
-      number they produce.
+      Click anywhere on the input to move the window there, or press scan and watch it sweep. The panel
+      on the right shows all nine multiplications for wherever the window is now, and the single number
+      they add up to.
     </p>
 
     <div class="split even">
@@ -92,9 +92,10 @@
         <div class="panel-title"><h3>Output · the feature map</h3><span class="hint">grey = zero, black/white = strong response</span></div>
         <canvas id="conv-out" role="img" aria-label="Output feature map produced by the current kernel."></canvas>
         <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
-          For edge kernels the output is centred on mid-grey: zero response is grey, a strong positive
-          response is white and a strong negative one is black. An edge detector doesn't say "edge
-          here", it says "the brightness is changing here, in this direction, by this much".
+          For edge kernels the output is centred on mid-grey: no response is grey, a strong positive is
+          white, a strong negative is black. An edge detector never says "edge here". It says "brightness is
+          changing here, in this direction, by this much", and everything downstream has to make do with
+          that.
         </p>
       </div>
     </div>
@@ -127,17 +128,17 @@
           </label>
         </div>
         <p class="muted" style="font-size:.8rem;margin-top:10px;margin-bottom:0">
-          Uploads stay on your machine — the file is read straight into the canvas and never leaves
-          the page.
+          Uploads stay on your machine. The file is read straight into the canvas and never leaves the
+          page.
         </p>
       </div>
       <div class="panel">
         <div class="panel-title"><h3>The same image through six kernels</h3></div>
         <div id="filter-bank"></div>
         <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
-          A real convolutional layer does exactly this: it runs a whole <em>bank</em> of kernels over
-          the same input and stacks the results into a pile of feature maps, one per kernel. The
-          difference is that it doesn't use anyone's hand-written numbers — it learns its own.
+          A real convolutional layer does precisely this: run a whole bank of kernels over the same input
+          and stack the results into a pile of feature maps, one per kernel. The only difference is that it
+          doesn't use anybody's hand-written numbers. It learns its own.
         </p>
       </div>
     </div>
@@ -147,25 +148,25 @@
     <h2>Three details that matter later</h2>
     <h3>Padding, or what happens at the border</h3>
     <p>
-      The window at pixel (0,0) hangs off the edge of the image. Something has to fill those cells:
-      this page repeats the nearest edge pixel, others pad with zeros or refuse to compute the border
-      at all (which shrinks the output by two pixels per convolution). It sounds like a footnote until
-      you stack twenty layers and discover your image has quietly shrunk away.
+      The window at pixel (0,0) hangs off the edge of the image, and something has to fill those empty
+      cells. This page repeats the nearest edge pixel. Other implementations pad with zeros, or refuse to
+      compute the border at all, which quietly shrinks the output by two pixels per convolution. It sounds
+      like a footnote right up until you stack twenty layers and go looking for your missing image.
     </p>
 
     <h3>Stride, or how far the window jumps</h3>
     <p>
-      Sliding one pixel at a time gives an output the same size as the input. Jump two pixels at a
-      time — stride 2 — and the output is half the size in each direction. It's the cheapest way to
-      shrink a representation as it moves deeper into a network.
+      Sliding one pixel at a time gives you an output the same size as the input. Jump two pixels
+      instead, which is stride 2, and the output is half the size in each direction. It's the cheapest way
+      there is to shrink a representation as it moves deeper into a network.
     </p>
 
     <h3>Pooling, or throwing away the details on purpose</h3>
     <p>
-      Max pooling takes each 2×2 block and keeps only the largest value. You lose exactly where within
-      the block the response happened, and that loss is the point: after pooling, "there's a vertical
-      edge around here" survives while "at precisely this pixel" doesn't. That's how a network becomes
-      tolerant of a digit being drawn a couple of pixels to the left.
+      Max pooling takes each 2×2 block and keeps only the biggest value. You lose exactly where inside
+      the block the response happened, and losing it is the entire point. After pooling, "there's a
+      vertical edge around here" survives and "at precisely this pixel" doesn't. That's how a network stops
+      caring whether a digit was drawn two pixels to the left.
     </p>
     <div class="panel">
       <div class="pool-row">
@@ -180,8 +181,8 @@
         </div>
       </div>
       <p class="muted" style="font-size:.82rem;margin-top:12px;margin-bottom:0">
-        Half the width, half the height, a quarter of the numbers — and the strong responses all
-        survive. Change the kernel above and this updates with it.
+        Half the width, half the height, a quarter of the numbers, and the strong responses all come
+        through intact. Change the kernel above and this updates with it.
       </p>
     </div>
   </div>
@@ -189,29 +190,41 @@
   <div class="section">
     <h2>Experiments worth running</h2>
     <ul>
-      <li><strong>Type your own kernel.</strong> Put <code>1</code> in the top row, <code>−1</code> in
-        the bottom, zeros in the middle. You've just built a horizontal edge detector. Now flip the
-        signs and watch the output invert: the filter has a direction, and it cares which side is bright.</li>
-      <li><strong>Make every weight the same small positive number.</strong> That's a blur, and the
-        reason is worth sitting with: averaging a neighbourhood destroys exactly the high-frequency
-        detail an edge kernel is looking for. Blur and edge-detect are opposites.</li>
-      <li><strong>Run Sobel X on the diagonal stripes, then Sobel Y.</strong> Same image, very
-        different maps. One kernel cannot see everything, which is why layers have dozens of them.</li>
-      <li><strong>Try the noise image with a blur.</strong> Then with sharpen. Sharpening noise
-        produces more noise — a filter has no idea what's signal.</li>
-      <li><strong>Draw a thick white line, then a thin one.</strong> Compare the Laplacian's response.
-        Kernel size sets the scale of feature a layer can see; a 3×3 kernel is blind to anything
-        wider than three pixels, which is why real networks stack them.</li>
-      <li><strong>Upload a photo of yourself.</strong> Sobel X on a face is a genuinely strange and
-        useful thing to look at: it's roughly the first thing every vision model computes.</li>
+      <li>
+        <b>Type your own kernel.</b> Put 1 across the top row, −1 across the bottom, zeros in the middle.
+        You've just built a horizontal edge detector. Now flip the signs and watch the output invert: the
+        filter has a direction and it cares which side is bright.
+      </li>
+      <li>
+        <b>Make every weight the same small positive number.</b> That's a blur, and the reason is worth
+        sitting with. Averaging a neighbourhood destroys exactly the high-frequency detail an edge kernel
+        exists to find. Blur and edge-detect are opposites.
+      </li>
+      <li>
+        <b>Run Sobel X on the diagonal stripes, then Sobel Y.</b> Same image, completely different maps.
+        One kernel can't see everything, which is why real layers carry dozens of them.
+      </li>
+      <li>
+        <b>Try the noise image with a blur, then with sharpen.</b> Sharpening noise gives you louder
+        noise. A filter has no idea which parts are signal.
+      </li>
+      <li>
+        <b>Draw a thick white line, then a thin one.</b> Compare the Laplacian's response to each. Kernel
+        size sets the scale of feature a layer can even perceive, and a 3×3 kernel is blind to anything wider
+        than three pixels. Stacking is how networks get around that.
+      </li>
+      <li>
+        <b>Upload a photo of yourself.</b> Sobel X on a face is a genuinely odd thing to look at, and it's
+        roughly the first thing every vision model in the world computes about you.
+      </li>
     </ul>
   </div>
 
   <div class="section">
     <h2>Check yourself</h2>
     <p>
-      Three questions on what you just made happen. They are not a test you can fail — the
-      explanation appears either way, and the wrong answers are the ones worth reading.
+      Three questions on the arithmetic you just did by hand. You can't fail this — the explanation
+      appears either way, and the wrong answers are the ones worth reading.
     </p>
     <div class="panel" id="quiz"></div>
   </div>

@@ -212,7 +212,7 @@ a model is a function with numbers in it, and every one of those numbers came fr
     slider(cfg, {
       label: 'context window', min: 8, max: 48, step: 4, value: context,
       format: (v) => v.toFixed(0) + ' characters', onInput: (v) => { context = v | 0; rebuild(); },
-      desc: 'How far back the model can see. Everything before this simply does not exist to it — which is why a short context produces text that forgets what sentence it is in.',
+      desc: 'How far back the model can see. Everything before this does not exist to it, which is why a short context produces text that forgets what sentence it is in.',
     });
     slider(cfg, {
       label: 'embedding size', min: 8, max: 64, step: 8, value: dim,
@@ -265,7 +265,7 @@ a model is a function with numbers in it, and every one of those numbers came fr
         say(`Step ${step.toLocaleString()}, loss ${l.toFixed(2)}.`);
         chart.push(step, [l]);
         chart.draw();
-        if (l < 1.0) achieve('lm-words', `Loss ${l.toFixed(2)} — it is writing real words now`);
+        if (l < 1.0) achieve('lm-words', `Loss ${l.toFixed(2)}, and it is writing real words now`);
       }
       if (++sinceSample > 25) { sinceSample = 0; refreshSample(); drawAttention(); }
       frame++;

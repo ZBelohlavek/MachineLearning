@@ -23,10 +23,10 @@
     <div class="kicker">Core ideas · start here</div>
     <h1>How a neural network learns</h1>
     <p class="lead">
-      Every model on this site — the vision networks, the Rocket League agent — is the same machine
-      underneath: a stack of multiplications with a knob on each one, and a procedure for turning
-      those knobs. This page is that machine, small enough to watch. Draw some points and train it
-      in front of you.
+      Every model on this site is the same machine underneath. The vision networks, the Rocket League
+      agent, the thing that writes sentences: all of them are a stack of multiplications with a knob on
+      each one, plus a procedure for turning the knobs. This page is that machine, small enough to watch
+      work. Draw some points and train it in front of you.
     </p>
   </div>
 
@@ -35,33 +35,34 @@
   <div class="section">
     <h2>The whole idea in four sentences</h2>
     <p>
-      A neural network is a function with adjustable numbers in it. You feed in an input — here, the
-      two coordinates of a point — and it produces an output, here a number between 0 and 1 meaning
-      "how confident am I that this point is orange?".
+      A neural network is a function with adjustable numbers in it. You feed in an input, here the two
+      coordinates of a point, and it produces an output, here a number between 0 and 1 meaning "how
+      confident am I that this one is orange?".
     </p>
     <p>
-      A <strong>loss function</strong> scores how wrong that output was. <strong>Backpropagation</strong>
-      then works out, for every single weight in the network, whether nudging it up or down would have
-      made the loss smaller — and by how much. <strong>Gradient descent</strong> takes a small step in
-      that direction. Repeat a few thousand times and the boundary you see below bends itself around
-      your data.
+      A <strong>loss function</strong> scores how wrong that answer was.
+      <strong>Backpropagation</strong> then works out, for every weight in the network, whether nudging it
+      up or down would have made the loss smaller, and by how much. <strong>Gradient descent</strong>
+      takes a small step that way. Run that a few thousand times and the boundary below bends itself
+      around your data.
     </p>
     <div class="eq">
       loss &nbsp;=&nbsp; how wrong we were &nbsp;&nbsp;→&nbsp;&nbsp; gradient &nbsp;=&nbsp; ∂loss/∂weight
       &nbsp;&nbsp;→&nbsp;&nbsp; weight &nbsp;←&nbsp; weight &nbsp;−&nbsp; learning-rate × gradient
     </div>
     <p style="margin-top:14px">
-      That's it. Everything else in deep learning is this loop with better plumbing.
+      That's the whole thing. Everything else in deep learning is this loop with better plumbing
+      attached.
     </p>
   </div>
 
   <div class="section">
     <h2>The playground</h2>
     <p>
-      Blue-outlined points are <strong>training</strong> data the network learns from; white-outlined
-      points are <strong>test</strong> data it never sees during training. The background shows what
-      the network currently believes about every point in the plane. You can draw your own points
-      directly onto the canvas.
+      Blue-outlined points are <strong>training</strong> data the network learns from. White-outlined
+      points are <strong>test</strong> data it never gets to see. The background shows what the network
+      currently believes about every point in the plane, including the ones you haven't drawn yet. Click
+      and drag to add your own.
     </p>
 
     <div class="split">
@@ -93,10 +94,12 @@
         <canvas id="loss-chart" class="fit" style="margin-top:14px" role="img" aria-label="Chart of training and test loss per epoch."></canvas>
         <div class="note warn" style="margin-top:14px">
           <b class="label">Watch the two curves separate</b>
-          <p class="mb0">While both fall, the network is learning something real. The moment the
-          orange test curve turns back upward while the blue one keeps dropping, it has started
-          memorising noise instead of finding structure. That's <em>overfitting</em>, and it is the
-          single most common way a model that looks great turns out to be useless.</p>
+          <p class="mb0">
+            While both curves fall, the network is learning something real. The moment the orange test curve
+            turns back upward while the blue one keeps dropping, it has switched to memorising noise. That's
+            <em>overfitting</em>, and it's the most common way a model that looks great turns out to be
+            worthless.
+          </p>
         </div>
       </div>
     </div>
@@ -109,12 +112,12 @@
         </div>
         <canvas id="landscape" role="img" aria-label="Loss landscape: two random directions through weight space, coloured by training loss."></canvas>
         <p class="muted" style="font-size:.82rem;margin:12px 0 0">
-          Two random directions through the network's entire weight space, swept across a grid and
-          coloured by the training loss found there — bright is low, dark is high. The white line is
-          the path training has actually taken, projected onto that plane, and the dot is where the
-          model is now. It is a two-dimensional window onto a 67-dimensional surface, so treat it as
-          a cross-section rather than a map: the real descent happens in every direction at once, and
-          this slice is recomputed as the other weights move.
+          Two random directions through the network's entire weight space, swept across a grid and coloured
+          by the training loss found there. Bright is low, dark is high. The white line is the path training
+          actually took, projected onto that plane, and the dot is where the model sits now. This is a
+          two-dimensional window onto a 67-dimensional surface, so read it as a cross-section, not a map. The
+          real descent is happening in every direction at once, and the slice gets recomputed as the other
+          weights move.
         </p>
       </div>
       <div class="panel">
@@ -138,16 +141,16 @@
     <h2>What each neuron is actually doing</h2>
     <p>
       Each tile below is one hidden neuron, drawn across the same square of space as the main canvas:
-      orange where that neuron fires positively, blue where it fires negatively.
+      orange where it fires positively, blue where it fires negatively. Neurons in the first layer can only
+      draw a straight edge, because a weighted sum followed by a squashing function has no other move
+      available to it.
     </p>
     <div class="panel">
       <div id="neurons"></div>
       <p class="muted" style="font-size:.84rem;margin-bottom:0">
-        Neurons in the first layer can only ever draw a straight edge — that's all a weighted sum
-        followed by a squashing function can do. The interesting part is the second layer, whose
-        neurons combine those straight edges into corners, stripes and blobs. Depth is exactly this:
-        composing simple pieces into complicated shapes. Train the spiral with one hidden layer, then
-        with three, and compare the tiles.
+        The second layer is where it gets interesting. Its neurons combine those straight edges into
+        corners, stripes and blobs. That's all depth is: composing simple pieces into complicated shapes.
+        Train the spiral with one hidden layer, then with three, and compare the tiles.
       </p>
     </div>
   </div>
@@ -155,31 +158,43 @@
   <div class="section">
     <h2>Experiments worth running</h2>
     <ul>
-      <li><strong>Remove all hidden layers.</strong> The model collapses to logistic regression and can
-        only draw one straight line. On the blobs it does fine. On the spiral it is hopeless, no
-        matter how long you train — some problems need depth, not patience.</li>
-      <li><strong>Train the spiral with 2 neurons per layer, then 16.</strong> Capacity is the ability
-        to represent complicated shapes. Too little and it can't fit; too much and it fits your noise
-        as eagerly as your signal.</li>
-      <li><strong>Set noise to 0.35 and train a big network for a long time.</strong> Watch train
-        accuracy march toward 100% while test accuracy stalls or falls. Now add weight decay and watch
-        the boundary calm down.</li>
-      <li><strong>Set the learning rate to 0.3.</strong> The loss curve turns into a saw. The steps
-        are so big they overshoot the valley they're trying to descend into.</li>
-      <li><strong>Switch tanh to ReLU on the circles.</strong> ReLU boundaries are made of straight
-        facets — you can see the polygon. tanh gives you curves. The activation function is quite
-        literally the shape of what the network can draw.</li>
-      <li><strong>Draw a tiny cluster of orange points inside the blue region.</strong> Then train.
-        How much does one small contradiction distort the whole boundary? That's how brittle a model
-        trained on a handful of points really is.</li>
+      <li>
+        <b>Remove all hidden layers.</b> The model collapses into logistic regression and can draw exactly
+        one straight line. On the blobs it does fine. On the spiral it's hopeless however long you train it,
+        because some problems need depth rather than patience.
+      </li>
+      <li>
+        <b>Train the spiral with 2 neurons per layer, then 16.</b> Capacity is how complicated a shape the
+        model can represent. Too little and it can't fit the data. Too much and it fits your noise with the
+        same enthusiasm as your signal.
+      </li>
+      <li>
+        <b>Set noise to 0.35 and train a big network for a long time.</b> Train accuracy marches toward
+        100% while test accuracy stalls or slides backward. Now switch weight decay on and watch the
+        boundary calm down.
+      </li>
+      <li>
+        <b>Set the learning rate to 0.3.</b> The loss curve turns into a saw blade. The steps are big
+        enough to overshoot the valley they're trying to get into, every time.
+      </li>
+      <li>
+        <b>Switch tanh to ReLU on the circles.</b> ReLU boundaries are built from straight facets and you
+        can count the polygon's sides. tanh gives you curves. The activation function is quite literally the
+        shape of what the network is able to draw.
+      </li>
+      <li>
+        <b>Draw a tiny cluster of orange points inside the blue region.</b> Then train and see how far
+        that one contradiction bends the whole boundary. That's how brittle a model built on a handful of
+        points really is.
+      </li>
     </ul>
   </div>
 
   <div class="section">
     <h2>Check yourself</h2>
     <p>
-      Three questions on what you just made happen. They are not a test you can fail — the
-      explanation appears either way, and the wrong answers are the ones worth reading.
+      Three questions on the network you just trained. You can't fail this — the explanation appears
+      either way, and the wrong answers are the ones worth reading.
     </p>
     <div class="panel" id="quiz"></div>
   </div>

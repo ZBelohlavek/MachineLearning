@@ -55,9 +55,9 @@
     <div class="kicker">Computer vision · the real thing</div>
     <h1>Build and train a digit CNN</h1>
     <p class="lead">
-      In the last lesson you chose the kernel numbers yourself. Here the network chooses them — by
-      being wrong ten thousand times and adjusting. Train it in your browser, then draw a digit with
-      your mouse and watch it flow through every layer.
+      Last lesson you picked the kernel numbers yourself. Here the network picks them, by being wrong
+      ten thousand times and adjusting a little after each one. Train it in your browser, then draw a digit
+      with your mouse and watch it move through every layer.
     </p>
   </div>
 
@@ -66,9 +66,9 @@
   <div class="section">
     <h2>The data, made from nothing</h2>
     <p>
-      There's no dataset to download. Every training image below is drawn by your browser: a random
-      digit in a random font, at a random size, rotated a little, shifted a little, with a dusting of
-      noise. Press "New data" to make a fresh batch.
+      There's no dataset to download. Every training image below is drawn by your browser on the spot: a
+      random digit in a random font, random size, rotated a bit, shifted a bit, with a dusting of noise on
+      top. Press "New data" for a fresh batch.
     </p>
     <div class="panel">
       <div class="panel-title">
@@ -82,11 +82,13 @@
     </div>
     <div class="note" style="margin-top:16px">
       <b class="label">Why bother randomising the fonts?</b>
-      <p class="mb0">Because a model only ever learns the variation it sees. Train on one font and
-      you get something that recognises that font — it will fail on your handwriting and you'll have
-      no warning, because your test set has the same blind spot as your training set. Turning the
-      augmentation slider down to zero and then trying to draw a digit is the fastest way to feel
-      what that failure is like.</p>
+      <p class="mb0">
+        Because a model only ever learns the variation it's shown. Train on one font and you get something
+        that recognises that font. It will fail on your handwriting and it won't warn you, because your test
+        set has precisely the same blind spot as your training set. Turn the augmentation slider to zero,
+        train to a beautiful number, then try drawing a digit. It's the fastest way to feel that failure
+        rather than nod along to it.
+      </p>
     </div>
   </div>
 
@@ -94,16 +96,15 @@
     <h2>The architecture</h2>
     <p>
       Two convolutional layers, each followed by ReLU and 2×2 max pooling, then two fully connected
-      layers ending in ten scores — one per digit. This is the standard shape of a small image
-      classifier, and it has been the standard shape since the 1990s.
+      layers ending in ten scores, one per digit. This is the standard shape of a small image classifier
+      and has been since the 1990s.
     </p>
     <div class="panel">
       <div id="arch-diagram"></div>
       <p class="muted" style="font-size:.84rem;margin:14px 0 0">
-        Notice the trade the network makes as you go right: the image gets smaller (20×20 → 10×10 →
-        5×5) while the stack of channels gets deeper. It is trading <em>where</em> something is for
-        <em>what</em> it is. By the final pooling layer, position is nearly gone and identity is
-        nearly all that's left.
+        Watch the trade it makes going left to right: the image shrinks (20×20 → 10×10 → 5×5) while the
+        stack of channels gets deeper. It's swapping <em>where</em> something is for <em>what</em> it is. By
+        the last pooling layer, position is almost gone and identity is almost all that's left.
       </p>
     </div>
   </div>
@@ -111,8 +112,8 @@
   <div class="section">
     <h2>Train it</h2>
     <p>
-      Press train. Test accuracy usually passes 90% within a few seconds and keeps climbing — the
-      whole thing is a few hundred thousand multiply-adds per image, which your laptop finds easy.
+      Press train. Test accuracy usually clears 90% within a few seconds and keeps going. The whole
+      model is a few hundred thousand multiply-adds per image, which your laptop finds trivial.
     </p>
     <div id="model-banner" class="note"></div>
 
@@ -139,18 +140,18 @@
         <div id="confusion-predict"></div>
         <div id="confusion"></div>
         <p class="muted" style="font-size:.8rem;margin:12px 0 0">
-          A single accuracy number hides everything interesting. The off-diagonal cells tell you
-          <em>which</em> mistakes it makes — 4 confused with 9, 3 with 8, 5 with 6 — and those
-          confusions are usually reasonable, which is a good sign it learned shape rather than noise.
+          A single accuracy number hides everything interesting. The off-diagonal cells are where the story
+          is: 4 confused with 9, 3 with 8, 5 with 6. Those confusions being reasonable is a good sign that it
+          learned shape rather than noise.
         </p>
       </div>
       <div class="panel">
         <div class="panel-title"><h3>What it gets wrong</h3><span class="hint">prediction (truth)</span></div>
         <div id="mistakes"></div>
         <p class="muted" style="font-size:.8rem;margin:12px 0 0">
-          Look at these rather than the accuracy. Most will be genuinely ambiguous — a heavily
-          rotated 7 that really does look like a 1. When your model's mistakes stop being
-          embarrassing and start being defensible, you're close to the limit of the data.
+          Look at these rather than the accuracy. Most will be genuinely ambiguous, like a heavily rotated 7
+          that really does look like a 1. Once your model's mistakes stop being embarrassing and start being
+          defensible, you're near the limit of what the data can tell it.
         </p>
       </div>
     </div>
@@ -159,9 +160,9 @@
   <div class="section">
     <h2>Draw a digit</h2>
     <p>
-      Draw with the mouse in the black box. The network sees the tiny 20×20 version next to it — that
-      shrunken, blurry square is the entire input. Everything it knows about your handwriting has to
-      survive that downscale.
+      Draw with the mouse in the black box. The network sees the tiny 20×20 version beside it, and that
+      shrunken blurry square is the entire input. Everything it knows about your handwriting has to survive
+      that downscale.
     </p>
     <div class="split">
       <div class="panel">
@@ -185,9 +186,9 @@
           <span class="hint" id="duel-best"></span>
         </div>
         <p class="muted" style="font-size:.86rem;margin-bottom:12px">
-          The network names a digit, you draw it. Every one it recognises with over 60% confidence
-          scores a point. Your handwriting is nothing like its training data, which is exactly what
-          makes this a real test.
+          The network names a digit, you draw it. Anything it recognises with over 60% confidence scores a
+          point. Your handwriting looks nothing like its training data, which is what makes this an actual
+          test rather than a victory lap.
         </p>
         <div class="duel-row">
           <div class="duel-target" id="duel-target">–</div>
@@ -207,10 +208,10 @@
         <div class="panel-title"><h3>Confidence</h3></div>
         <div id="prob-bars"></div>
         <p class="muted" style="font-size:.8rem;margin:12px 0 0">
-          These ten numbers are a softmax over the final layer's scores, so they're forced to add up
-          to 100%. That is worth remembering: the model <em>cannot</em> tell you "this is not a
-          digit". Draw a spiral and it will still confidently pick one. Calibrated uncertainty is a
-          hard, unsolved-in-general problem, and this is the demonstration of why.
+          These ten numbers are a softmax over the final layer's scores, so they're forced to add up to
+          100%. Keep that in mind, because it means the model has no way to tell you "that isn't a digit".
+          Draw a spiral and it will still confidently name one. Calibrated uncertainty is a hard and generally
+          unsolved problem, and this is the cheapest demonstration of why.
         </p>
       </div>
     </div>
@@ -220,48 +221,58 @@
     <h2>Inside the layers</h2>
     <p>
       These update live as you draw. The purple tiles are the actual 3×3 kernels the first layer
-      learned — compare them with the hand-written Sobel kernels from the previous lesson. Nobody
-      told the network to build edge detectors; gradient descent found them because they are the most
-      useful thing a 3×3 window can compute.
+      learned. Put them next to the hand-written Sobel kernels from the previous lesson. Nobody told this
+      network to build edge detectors; gradient descent found them because they're the most useful thing a
+      3×3 window can compute.
     </p>
     <div class="panel">
       <div id="feature-maps"></div>
     </div>
     <p class="muted" style="font-size:.86rem">
-      Layer 1 responds to strokes: an edge here, a corner there. Layer 2 is harder to read by eye, and
-      that's the honest situation — its units respond to combinations of layer 1's outputs, and in
-      bigger networks the deeper layers get less and less interpretable. A great deal of research
-      exists purely to explain what these pictures mean.
+      Layer 1 responds to strokes: an edge here, a corner there. Layer 2 is much harder to read by eye,
+      and that's the honest situation rather than a failure of this page. Its units respond to combinations
+      of layer 1's outputs, and in bigger networks the deeper layers get steadily less interpretable. A
+      great deal of research exists purely to work out what these pictures mean.
     </p>
   </div>
 
   <div class="section">
     <h2>Experiments worth running</h2>
     <ul>
-      <li><strong>Drop layer 1 to two filters.</strong> Two 3×3 patterns is not enough vocabulary to
-        describe ten digits, and the accuracy ceiling drops hard. Capacity has a floor as well as a
-        risk.</li>
-      <li><strong>Set augmentation to 0, train to 99%, then draw a digit yourself.</strong> The
-        test accuracy stays beautiful and the predictions on your handwriting fall apart. Your test
-        set was drawn from the same narrow distribution as your training set, so it certified
-        nothing.</li>
-      <li><strong>Set augmentation to 2 and train.</strong> Accuracy is lower and much more honest,
-        and drawn digits work better. Harder training data, better model.</li>
-      <li><strong>Set batch size to 1.</strong> Every image yanks the weights around individually.
-        The accuracy curve gets visibly noisier — that's the variance a batch is averaging away.</li>
-      <li><strong>Set the learning rate to 0.02.</strong> Watch the loss refuse to settle, and the
-        learned kernels turn into noise.</li>
-      <li><strong>Draw a digit in a corner instead of the middle.</strong> Convolution is translation
-        <em>equivariant</em> — the features shift with the digit — but those two dense layers at the
-        end are not. This is exactly why data augmentation with random shifts exists.</li>
+      <li>
+        <b>Drop layer 1 to two filters.</b> Two 3×3 patterns isn't enough vocabulary to describe ten
+        digits, and the accuracy ceiling falls hard. Capacity has a floor as well as a risk.
+      </li>
+      <li>
+        <b>Set augmentation to 0, train to 99%, then draw a digit yourself.</b> The test accuracy stays
+        gorgeous while the predictions on your handwriting fall apart. Your test set came from the same
+        narrow distribution as your training set, so it certified nothing at all.
+      </li>
+      <li>
+        <b>Set augmentation to 2 and train.</b> Accuracy drops and gets much more honest, and drawn digits
+        work noticeably better. Harder training data, better model.
+      </li>
+      <li>
+        <b>Set batch size to 1.</b> Every single image yanks the weights around on its own. The accuracy
+        curve gets visibly noisier, and that noise is the variance a batch was quietly averaging away.
+      </li>
+      <li>
+        <b>Set the learning rate to 0.02.</b> Watch the loss refuse to settle and the learned kernels
+        degenerate into static.
+      </li>
+      <li>
+        <b>Draw a digit in a corner instead of the middle.</b> Convolution is translation equivariant, so
+        the features shift along with the digit, but those two dense layers at the end are not. This is
+        exactly why augmentation with random shifts exists.
+      </li>
     </ul>
   </div>
 
   <div class="section">
     <h2>Check yourself</h2>
     <p>
-      Three questions on what you just made happen. They are not a test you can fail — the
-      explanation appears either way, and the wrong answers are the ones worth reading.
+      Three questions on the CNN you just trained. You can't fail this — the explanation appears either
+      way, and the wrong answers are the ones worth reading.
     </p>
     <div class="panel" id="quiz"></div>
   </div>

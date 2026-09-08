@@ -413,7 +413,7 @@
       }
       showBest();
       duelMsg.innerHTML = `Time. You got <b>${duel.score}</b> past the network` +
-        (duel.score >= 8 ? ' — that is a properly good score.'
+        (duel.score >= 8 ? '. That is a properly good score.'
          : duel.score >= 4 ? '. Try training it a little longer, or draw bigger.'
          : '. If it is missing easy digits, it needs more training or more augmentation.');
       if (duel.score >= 8) achieve('cnn-duel', `You scored ${duel.score} in the digit duel`);
@@ -440,7 +440,7 @@
       if (best === duel.target && probs[best] > 0.6) {
         duel.score++;
         duelScore.textContent = String(duel.score);
-        duelMsg.innerHTML = `<span style="color:var(--good)">Yes — that's a ${best}.</span>`;
+        duelMsg.innerHTML = `<span style="color:var(--good)">Yes, that's a ${best}.</span>`;
         nextTarget();
         // Wait for the pen to come up: clearing mid-stroke leaves the tail of
         // the stroke behind on the fresh pad.
@@ -487,7 +487,7 @@
       const key = `${pair[0]}-${pair[1]}`;
       const known = PAIR_OPTS.some((o) => o.value === key);
       confusionPredict.reveal(known ? key : 'other',
-        `Your network's most confused pair is <b>${pair[0]} and ${pair[1]}</b> — ${count} of its ` +
+        `Your network's most confused pair is <b>${pair[0]} and ${pair[1]}</b>: ${count} of its ` +
         `${total} mistakes. Which pairs collide depends on the fonts this run happened to draw, so ` +
         `train it again with a different seed and the answer can genuinely change.`);
     }

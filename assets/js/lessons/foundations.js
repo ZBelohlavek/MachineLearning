@@ -486,7 +486,7 @@
     slider(dataCtl, {
       label: 'noise', min: 0, max: 0.4, step: 0.01, value: noise,
       format: (v) => v.toFixed(2), onInput: (v) => { noise = v; regenerate(); },
-      desc: 'Messier data makes the gap between training and test loss — overfitting — much easier to see.',
+      desc: 'Messier data makes the gap between training and test loss, which is overfitting, much easier to see.',
     });
     slider(dataCtl, {
       label: 'points', min: 40, max: 400, step: 10, value: nPoints,
@@ -547,7 +547,7 @@
     slider(optCtl, {
       label: 'batch size', min: 1, max: 64, step: 1, value: batchSize,
       format: (v) => v.toFixed(0), onInput: (v) => { batchSize = v; },
-      desc: 'How many points contribute to each step. Small batches are noisy — which sometimes helps.',
+      desc: 'How many points contribute to each step. Small batches are noisy, which sometimes helps.',
     });
     slider(optCtl, {
       label: 'weight decay (L2)', min: 0, max: 0.02, step: 0.0005, value: 0,
