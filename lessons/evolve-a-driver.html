@@ -66,7 +66,9 @@
           <h3>The track</h3>
           <span class="hint">turn on the brush to draw your own</span>
         </div>
-        <canvas id="track-canvas" role="img" aria-label="Racetrack with the evolving population of cars."></canvas>
+        <div class="stage" id="track-stage">
+          <canvas id="track-canvas" role="img" aria-label="Racetrack with the evolving population of cars."></canvas>
+        </div>
         <div id="track-warning" class="note warn" style="margin-top:12px;font-size:.86rem" hidden></div>
         <div class="controls" style="margin-top:12px">
           <button id="btn-run" class="primary">▶ Evolve</button>
@@ -80,8 +82,11 @@
           <div class="keycap-row">
             <span class="kbd-hint"><kbd>↑</kbd> throttle <kbd>↓</kbd> brake <kbd>←</kbd> <kbd>→</kbd> steer</span>
             <button id="btn-race-again" class="small">Restart race</button>
+            <span id="race-sound"></span>
           </div>
-          <div id="race-readout" style="margin-top:10px;font-size:.92rem;color:var(--text-dim)"></div>
+          <div id="race-hud"></div>
+          <div id="race-readout" class="result-line"></div>
+          <div class="medal-track" id="race-medals"></div>
           <div id="race-pad"></div>
         </div>
         <div style="margin-top:14px">
@@ -215,7 +220,8 @@
       <li>
         <b>Race the champion, and lose.</b> Then watch how it does it: barely steering on the straights,
         turning hard exactly at the apex, because everything else got selected out generations ago. It isn't
-        driving well. It's driving in the only way that survived.
+        driving well. It's driving in the only way that survived. Finish once and your lap is saved as a
+        ghost car, so every attempt after that is really a race against the last-best version of you.
       </li>
     </ul>
   </div>
@@ -235,6 +241,7 @@
 <script src="../assets/js/lib/nn.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/arcade.js"></script>
 <script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/js/lessons/racer.js"></script>
 </body>

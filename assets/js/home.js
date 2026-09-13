@@ -250,11 +250,25 @@
 
       /* Progress lives in localStorage, which is per-browser and easy to lose.
          These move it as a small file. */
-      const KEYS = ['mlbb-badges', 'mlbb-quiz', 'mlbb-capstone', 'mlbb-predict', 'mlbb-duel-best'];
+      // Badges, quiz answers and predictions are fixed keys. Game records are
+      // not: every personal best and saved ghost lap gets its own key, so they
+      // are collected by prefix rather than listed here and forgotten later.
+      const FIXED = ['mlbb-badges', 'mlbb-quiz', 'mlbb-capstone', 'mlbb-predict', 'mlbb-sound'];
+      const PREFIXES = ['mlbb-best-', 'mlbb-ghost-'];
+      const savedKeys = () => {
+        const out = new Set(FIXED);
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (PREFIXES.some((p) => k && k.startsWith(p))) out.add(k);
+          }
+        } catch (err) { /* private mode */ }
+        return [...out];
+      };
       const exp = document.getElementById('export-progress');
       if (exp) exp.addEventListener('click', () => {
         const out = {};
-        for (const k of KEYS) { const v = localStorage.getItem(k); if (v !== null) out[k] = v; }
+        for (const k of savedKeys()) { const v = localStorage.getItem(k); if (v !== null) out[k] = v; }
         const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -270,7 +284,13 @@
         reader.onload = () => {
           try {
             const obj = JSON.parse(reader.result);
-            for (const k of KEYS) if (obj[k] !== undefined) localStorage.setItem(k, obj[k]);
+            // Accept anything the site owns, so a file written by a later
+            // version with more games still restores everything in it.
+            for (const k of Object.keys(obj)) {
+              if (FIXED.includes(k) || PREFIXES.some((p) => k.startsWith(p))) {
+                localStorage.setItem(k, obj[k]);
+              }
+            }
             location.reload();
           } catch (err) {
             alert('That file could not be read as saved progress.');

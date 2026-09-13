@@ -463,18 +463,46 @@
   <div class="section">
     <h2>Step 7 · Take it on yourself</h2>
     <p>
-      Switch the match to You vs agent and take the orange car. Playing your own agent tells you things
-      no chart will. Whether it bothers defending. Whether it panics near its own goal. Whether you can
-      walk around it the same way twice, which you usually can.
+      Two ways to find out how good your agent really is. Take five penalties against it in the shootout
+      below, or switch the match in Step 5 to You vs agent and play it properly with the orange car.
+      Playing your own agent tells you things no chart will: whether it bothers defending, whether it
+      panics near its own goal, whether you can walk around it the same way twice. You usually can.
     </p>
-    <div class="panel">
-      <div class="panel-title"><h3>Match settings</h3><span class="hint">applies to the arena in Step 5</span></div>
-      <div id="play-mode"></div>
-      <div id="match-pad"></div>
-      <p class="muted" style="font-size:.82rem;margin-top:12px">
-        Greedy mode drops the dice and always plays the top-scoring action, which is how you'd ship one of
-        these. Leave it off while training. The randomness is what's generating the learning.
-      </p>
+    <div class="split">
+      <div class="panel game-panel" id="shootout-panel">
+        <div class="panel-title">
+          <h3><span class="game-tag">game</span> Penalty shootout</h3>
+          <span class="hint">five shots</span>
+        </div>
+        <p class="muted" style="font-size:.86rem;margin-bottom:12px">
+          Five attempts at the left-hand goal with your agent defending it. The ball starts in front of
+          you and the clock starts with it. The agent was never taught to keep goal, so what you are
+          really up against is its instinct to drive at the ball and take it the other way.
+        </p>
+        <div class="stage" id="shootout-stage">
+          <canvas id="shootout-canvas" role="img" aria-label="Penalty shootout arena: you attack the left goal while the trained agent defends."></canvas>
+        </div>
+        <div id="shootout-hud"></div>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-shootout" class="primary">▶ Take five shots</button>
+          <span id="shootout-sound"></span>
+        </div>
+        <div class="keycap-row" style="margin-top:10px">
+          <span class="kbd-hint"><kbd>↑</kbd> throttle <kbd>↓</kbd> reverse <kbd>←</kbd> <kbd>→</kbd> steer</span>
+        </div>
+        <div id="shootout-pad"></div>
+        <div id="shootout-result" class="result-line"></div>
+        <div class="medal-track" id="shootout-medals"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Match settings</h3><span class="hint">applies to the arena in Step 5</span></div>
+        <div id="play-mode"></div>
+        <div id="match-pad"></div>
+        <p class="muted" style="font-size:.82rem;margin-top:12px">
+          Greedy mode drops the dice and always plays the top-scoring action, which is how you'd ship one of
+          these. Leave it off while training. The randomness is what's generating the learning.
+        </p>
+      </div>
     </div>
   </div>
 
@@ -528,6 +556,7 @@
 <script src="../assets/js/lib/nn.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/arcade.js"></script>
 <script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/models/rocket-stages.js"></script>
 <script src="../assets/models/rocket-stages-chaser.js"></script>

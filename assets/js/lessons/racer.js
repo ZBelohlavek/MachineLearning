@@ -15,6 +15,7 @@
   'use strict';
   const { MLP, mulberry32, randn, clamp, hidpi, LineChart, achieve, dpad,
           chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop } = window.ML;
+  const arcade = window.ML.arcade;
 
   const GW = 240, GH = 150;          // track grid, in cells
   const SENSORS = [-1.35, -0.9, -0.45, 0, 0.45, 0.9, 1.35];   // radians, relative to heading
@@ -397,6 +398,21 @@
       mark(track.finish, 'rgba(56,211,159,.9)', 'F');
 
       if (mode === 'race') {
+        // The ghost goes down first so the live cars draw over it.
+        if (ghost && !ghost.done) {
+          ctx.save();
+          ctx.globalAlpha = 0.45;
+          ctx.translate(ghost.x * scale, ghost.y * scale);
+          ctx.rotate(ghost.angle);
+          ctx.fillStyle = 'rgba(124,92,255,.55)';
+          ctx.fillRect(-CAR.len * scale / 2, -CAR.wid * scale / 2, CAR.len * scale, CAR.wid * scale);
+          ctx.strokeStyle = '#b9a8ff';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 2]);
+          ctx.strokeRect(-CAR.len * scale / 2, -CAR.wid * scale / 2, CAR.len * scale, CAR.wid * scale);
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
         if (player) {
           if (player.trail.length > 3) {
             ctx.strokeStyle = 'rgba(77,163,255,.35)'; ctx.lineWidth = 2;
@@ -410,6 +426,10 @@
           drawCar(player, '#4da3ff', 1, true);
         }
         if (rival) drawCar(rival, '#ff9f45', rival.alive ? 1 : 0.35, true);
+        if (raceFx.busy) {
+          raceFx.begin(ctx);
+          raceFx.end(ctx, DT, ctx._cssW, ctx._cssH);
+        }
         return;
       }
 
@@ -447,8 +467,40 @@
       ctx.fillRect(8, 8, (ctx._cssW - 16) * frac, 3);
     }
 
-    /* ---------------- race mode ---------------- */
+    /* ---------------- race mode ----------------
+       A time trial rather than a drag race. The champion is still there to
+       chase, but the opponent that actually makes you better is the ghost:
+       a replay of your own fastest run on this track, drawn as a translucent
+       car you can watch yourself losing to.
+       -------------------------------------------------------------------- */
     let player = null, rival = null, raceTime = 0, raceResult = '';
+    let ghost = null, ghostPath = null, recording = null, raceArmed = false, cancelCountdown = null;
+    let raceEnded = false;
+    const raceFx = arcade.fx();
+    const GHOST_STRIDE = 2;              // record every other tick; smooth enough at 60fps
+
+    // Times good enough for a medal, per track. Set from actual runs of each
+    // course rather than guessed, so gold is hard and bronze is reachable.
+    const RACE_TIERS = {
+      circuit: { gold: 13, silver: 17, bronze: 24 },
+      snake:   { gold: 16, silver: 21, bronze: 29 },
+      hairpin: { gold: 15, silver: 20, bronze: 28 },
+      grand:   { gold: 22, silver: 29, bronze: 40 },
+      custom:  { gold: 15, silver: 20, bronze: 28 },
+    };
+    let trackKey = 'circuit';
+    const tiersNow = () => RACE_TIERS[trackKey] || RACE_TIERS.custom;
+    const bestKey = () => 'racer-' + trackKey;
+    const ghostKey = () => 'mlbb-ghost-' + trackKey;
+
+    const raceHud = arcade.hud(document.getElementById('race-hud'), [
+      { name: 'time', label: 'time', value: '0.00' },
+      { name: 'you', label: 'you', value: '0%' },
+      { name: 'champ', label: 'champion', value: '0%' },
+      { name: 'best', label: 'your best', value: '—' },
+    ]);
+    arcade.soundToggle(document.getElementById('race-sound'));
+
     const keys = {};
     window.addEventListener('keydown', (e) => {
       const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
@@ -461,49 +513,134 @@
       if (k) keys[k] = false;
     });
 
+    function loadGhost() {
+      try {
+        const raw = localStorage.getItem(ghostKey());
+        const data = raw ? JSON.parse(raw) : null;
+        ghostPath = data && Array.isArray(data.path) && data.path.length > 4 ? data.path : null;
+      } catch (err) { ghostPath = null; }
+    }
+
+    function saveGhost(path, time) {
+      try {
+        localStorage.setItem(ghostKey(), JSON.stringify({ path, time }));
+      } catch (err) { /* private mode, or the path is too long to keep */ }
+    }
+
+    function showRaceBest() {
+      const b = arcade.readBest(bestKey());
+      raceHud.set('best', b === null ? '—' : b.toFixed(2) + 's');
+      const track_ = document.getElementById('race-medals');
+      if (!track_) return;
+      const t = tiersNow();
+      track_.innerHTML = ['gold', 'silver', 'bronze'].map((m) =>
+        `<span class="${b !== null && b <= t[m] ? 'won' : ''}">` +
+        `${arcade.MEDALS[m].icon} <b>under ${t[m]}s</b></span>`).join('') +
+        (ghostPath ? '<span>your ghost is on track</span>'
+                   : '<span>finish once to leave a ghost to race</span>');
+    }
+
     function startRace() {
+      if (cancelCountdown) cancelCountdown();
       player = new Car(null);
       player.reset(track, 0, rand);
       rival = new Car(bestEver ? MLP.fromJSON(bestEver.toJSON()) : newBrain());
       rival.reset(track, 0, rand);
+      loadGhost();
+      ghost = ghostPath ? { i: 0, x: ghostPath[0], y: ghostPath[1], angle: 0, done: false } : null;
+      recording = [];
       raceTime = 0;
       raceResult = '';
-      updateRaceUI();
+      raceArmed = false;
+      raceEnded = false;
+      raceFx.clear();
+      document.getElementById('race-readout').innerHTML = '';
+      raceHud.set('time', '0.00');
+      raceHud.set('you', '0%');
+      raceHud.set('champ', '0%');
+      showRaceBest();
+      // Nobody moves until the lights go out.
+      cancelCountdown = arcade.countdown(document.getElementById('track-stage'), () => {
+        raceArmed = true;
+        cancelCountdown = null;
+      });
+    }
+
+    function finishRace(won, crashed) {
+      if (raceEnded) return;
+      raceEnded = true;
+      if (crashed) {
+        raceResult = 'You crashed. The wall is undefeated.';
+        arcade.sfx('fail');
+        raceFx.shake(7);
+        raceFx.burst(player.x * scale, player.y * scale,
+          { count: 22, speed: 150, colors: ['#ff6b6b', '#ffb547'], gravity: 200 });
+        document.getElementById('race-readout').innerHTML =
+          '<span class="result-note">You crashed. The wall is undefeated.</span>';
+        return;
+      }
+
+      const res = arcade.resultCard(raceTime, {
+        tiers: tiersNow(), lower: true, bestKey: bestKey(), unit: 's',
+        format: (v) => v.toFixed(2),
+        note: won ? 'You beat the evolved champion.' : 'The champion got there first.',
+      });
+      raceResult = won ? 'You win.' : 'The champion got there first.';
+      document.getElementById('race-readout').innerHTML = res.html;
+      showRaceBest();
+
+      arcade.sfx(res.tier === 'gold' ? 'win' : 'goal');
+      raceFx.burst(player.x * scale, player.y * scale,
+        { count: 50, speed: 200, colors: ['#38d39f', '#4da3ff', '#ffd166'], gravity: 140 });
+      raceFx.flash('#38d39f', 0.2);
+
+      // A run only becomes the ghost if it was your quickest one here.
+      if (res.record && (res.record.first || res.record.isNew)) saveGhost(recording, raceTime);
+      if (won) achieve('racer-beaten', `You finished in ${raceTime.toFixed(2)}s`);
+      if (res.tier === 'gold') achieve('racer-gold', `${raceTime.toFixed(2)}s on the ${trackKey} course`);
     }
 
     function raceStep() {
+      if (!raceArmed || raceEnded) return;
       raceTime += DT;
-      if (player.alive) {
+      if (player.alive && !player.finished) {
         const steer = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
         const throttle = keys.up ? 1 : keys.down ? -0.4 : 0.05;
         player.step(track, [steer, throttle]);
-        if (player.finished) {
-          if (rival.finished) raceResult = 'You lost. The champion got there first.';
-          else {
-            raceResult = 'You win! You beat the evolved driver.';
-            achieve('racer-beaten', `You finished in ${raceTime.toFixed(2)}s`);
-          }
+        if (recording && (recording.length / 2) * GHOST_STRIDE <= raceTime * 60) {
+          recording.push(Math.round(player.x * 10) / 10, Math.round(player.y * 10) / 10);
         }
-        else if (!player.alive) raceResult = 'You crashed. The wall is undefeated.';
+        if (player.finished) finishRace(!rival.finished, false);
+        else if (!player.alive) finishRace(false, true);
       }
-      if (rival.alive) {
+      if (rival.alive && !rival.finished) {
         const s = rival.sense(track);
         const out = rival.brain.forward(s);
         rival.step(track, [out[0], (out[1] + 1) / 2]);
-        if (rival.finished && !player.finished && player.alive) raceResult = 'The champion finished first. Try again.';
-        else if (!rival.alive && !rival.finished && player.alive) raceResult = 'The champion crashed. The race is yours to lose.';
+        if (rival.finished && !player.finished && player.alive && !raceResult && !raceEnded) {
+          raceResult = 'The champion finished first. Try again.';
+          document.getElementById('race-readout').innerHTML =
+            '<span class="result-note">The champion crossed first. Keep going.</span>';
+          arcade.sfx('tick');
+        }
+      }
+      // The ghost is a replay, so it just walks its recorded path in step.
+      if (ghost && ghostPath) {
+        const idx = Math.floor(raceTime * 60 / GHOST_STRIDE) * 2;
+        if (idx + 1 < ghostPath.length) {
+          const nx = ghostPath[idx], ny = ghostPath[idx + 1];
+          ghost.angle = Math.atan2(ny - ghost.y, nx - ghost.x) || ghost.angle;
+          ghost.x = nx; ghost.y = ny;
+        } else ghost.done = true;
       }
       updateRaceUI();
     }
 
     function updateRaceUI() {
-      const el = document.getElementById('race-readout');
-      if (!el || !player) return;
-      el.innerHTML =
-        `<span class="mono">${raceTime.toFixed(2)}s</span> · ` +
-        `you <b style="color:var(--accent)">${(player.progress(track) * 100).toFixed(0)}%</b> · ` +
-        `champion <b style="color:var(--orange, #ff9f45)">${(rival.progress(track) * 100).toFixed(0)}%</b>` +
-        (raceResult ? ` — <b>${raceResult}</b>` : '');
+      if (!player) return;
+      raceHud.set('time', raceTime.toFixed(2));
+      raceHud.set('you', (player.progress(track) * 100).toFixed(0) + '%');
+      raceHud.set('champ', (rival.progress(track) * 100).toFixed(0) + '%');
     }
 
     /* ---------------- track drawing ---------------- */
@@ -518,6 +655,13 @@
       drawingTrack = false;
       track.computeDistance();
       paintTrack();
+      // A hand-drawn course is its own track: a ghost and a best time recorded
+      // on the Circuit mean nothing once you have moved the walls.
+      if (trackKey !== 'custom') {
+        trackKey = 'custom';
+        loadGhost();
+        showRaceBest();
+      }
     });
     function paintAt(ev) {
       const r = canvas.getBoundingClientRect();
@@ -587,9 +731,13 @@
       { value: 'grand', label: 'Grand tour' },
     ], 'circuit', (v) => {
       track.load(v);
+      trackKey = v;
       paintTrack();
       newPopulation();
       updateStats(0, 0, 0);
+      loadGhost();
+      showRaceBest();
+      if (mode === 'race') startRace();
     });
 
     const modePills = pills(document.getElementById('mode-pills'), [
@@ -649,6 +797,8 @@
     window.addEventListener('resize', () => { resize(); render(); });
     newPopulation();
     updateStats(0, 0, 0);
+    loadGhost();
+    showRaceBest();
 
     rafLoop(() => {
       const problem = trackProblem();

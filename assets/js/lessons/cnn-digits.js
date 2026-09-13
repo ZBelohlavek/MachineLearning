@@ -15,6 +15,7 @@
           mulberry32, softmax, argmax, clamp, hidpi, fit, LineChart, heat, diverging, achieve,
           chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop,
           renderDigit, makeDigitSet, imageFromCanvas } = window.ML;
+  const arcade = window.ML.arcade;
 
   const S = 20;                       // digit images are S x S
 
@@ -373,57 +374,99 @@
        A 60-second game: the network names a digit, you draw it, and it has to
        recognise your handwriting. It is a much better test of the model than
        any accuracy number, because your handwriting is not in its training set.
+
+       Scoring rewards two things the plain point-per-digit version did not:
+       drawing quickly, and stringing hits together. Both push you to draw the
+       clear, unambiguous shape the network is most confident about, which is
+       the behaviour that actually teaches you what it learned.
        ------------------------------------------------------------------- */
     const DUEL_SECONDS = 60;
+    const SKIP_PENALTY_MS = 3000;
+    const DUEL_TIERS = { gold: 250, silver: 140, bronze: 60 };
     let duel = null, duelPendingClear = false;
     const duelTarget = document.getElementById('duel-target');
-    const duelScore = document.getElementById('duel-score');
     const duelTimer = document.getElementById('duel-timer');
     const duelMsg = document.getElementById('duel-msg');
-    const duelBest = document.getElementById('duel-best');
-    const bestKey = 'mlbb-duel-best';
+    const padFx = arcade.fx();
 
-    function readBest() { return +(localStorage.getItem(bestKey) || 0); }
-    function showBest() { duelBest.textContent = readBest() ? `Best: ${readBest()}` : ''; }
+    const duelHud = arcade.hud(document.getElementById('duel-hud'), [
+      { name: 'score', label: 'score', value: '0' },
+      { name: 'combo', label: 'multiplier', value: '×1' },
+      { name: 'hits', label: 'digits', value: '0' },
+      { name: 'best', label: 'best', value: '—' },
+    ]);
+    arcade.soundToggle(document.getElementById('duel-sound'));
+
+    function showBest() {
+      const b = arcade.readBest('cnn-duel');
+      duelHud.set('best', b === null ? '—' : b);
+      const track = document.getElementById('duel-medals');
+      if (!track) return;
+      track.innerHTML = ['gold', 'silver', 'bronze'].map((t) =>
+        `<span class="${b !== null && b >= DUEL_TIERS[t] ? 'won' : ''}">` +
+        `${arcade.MEDALS[t].icon} <b>${DUEL_TIERS[t]}</b></span>`).join('') +
+        '<span>drawing faster and chaining hits is where the points are</span>';
+    }
 
     function nextTarget() {
       let d;
       do { d = (Math.random() * 10) | 0; } while (duel && d === duel.target && Math.random() < 0.8);
       duel.target = d;
+      duel.shownAt = performance.now();
       duelTarget.textContent = d;
     }
 
     function startDuel() {
       duelPendingClear = false;
-      duel = { target: 0, score: 0, ends: performance.now() + DUEL_SECONDS * 1000, done: false };
+      duel = {
+        target: 0, shownAt: 0, score: 0, hits: 0, bestStreak: 0,
+        ends: performance.now() + DUEL_SECONDS * 1000, done: false,
+        combo: arcade.combo({ windowMs: 7000, cap: 5 }),
+      };
       nextTarget();
       clearPad();
-      duelMsg.textContent = '';
-      duelScore.textContent = '0';
+      duelMsg.innerHTML = '';
+      duelHud.set('score', '0');
+      duelHud.set('hits', '0');
+      duelHud.set('combo', '×1');
       document.getElementById('btn-duel').textContent = 'Restart duel';
       document.getElementById('duel-panel').classList.add('live');
+      arcade.sfx('start');
     }
 
     function endDuel() {
       duel.done = true;
       document.getElementById('duel-panel').classList.remove('live');
-      const best = readBest();
-      if (duel.score > best) {
-        try { localStorage.setItem(bestKey, String(duel.score)); } catch (err) { /* private mode */ }
-      }
+      const { score, hits, bestStreak } = duel;
+      const res = arcade.resultCard(score, {
+        tiers: DUEL_TIERS, bestKey: 'cnn-duel',
+        note: `${hits} digit${hits === 1 ? '' : 's'} recognised` +
+              (bestStreak > 1 ? `, best streak ${bestStreak}` : '') + '. ' +
+              (hits >= 8 ? 'The network is holding up well against real handwriting.'
+               : hits >= 4 ? 'Train it a little longer, or draw bigger and bolder.'
+               : 'If it misses easy digits it needs more training, or more augmentation.'),
+      });
+      duelMsg.innerHTML = res.html;
       showBest();
-      duelMsg.innerHTML = `Time. You got <b>${duel.score}</b> past the network` +
-        (duel.score >= 8 ? '. That is a properly good score.'
-         : duel.score >= 4 ? '. Try training it a little longer, or draw bigger.'
-         : '. If it is missing easy digits, it needs more training or more augmentation.');
-      if (duel.score >= 8) achieve('cnn-duel', `You scored ${duel.score} in the digit duel`);
+      arcade.sfx(res.tier === 'gold' ? 'win' : hits >= 4 ? 'score' : 'fail');
+      if (res.tier && !arcade.isMuted()) padFx.burst(padSize / 2, padSize / 2,
+        { count: 60, speed: 190, colors: ['#ffd166', '#38d39f', '#4da3ff'], gravity: 120 });
+      if (hits >= 8) achieve('cnn-duel', `${hits} digits, ${score} points`);
+      if (res.tier === 'gold') achieve('cnn-duel-gold', `${score} points in the digit duel`);
       duelTimer.style.width = '0%';
       duel = null;
     }
 
     document.getElementById('btn-duel').addEventListener('click', startDuel);
     document.getElementById('btn-duel-skip').addEventListener('click', () => {
-      if (!duel) return;
+      if (!duel || duel.done) return;
+      // Skipping is allowed but never free, so "which digit is this?" stays a
+      // decision rather than a button you hold down.
+      duel.ends -= SKIP_PENALTY_MS;
+      duel.combo.miss();
+      duelHud.set('combo', '×1');
+      duelHud.flash('combo', 'bad');
+      arcade.sfx('tick');
       nextTarget();
       clearPad();
     });
@@ -437,16 +480,38 @@
     function duelCheck(probs, best, ink) {
       if (!duel || duel.done) return;
       if (ink < 5) return;
-      if (best === duel.target && probs[best] > 0.6) {
-        duel.score++;
-        duelScore.textContent = String(duel.score);
-        duelMsg.innerHTML = `<span style="color:var(--good)">Yes, that's a ${best}.</span>`;
-        nextTarget();
-        // Wait for the pen to come up: clearing mid-stroke leaves the tail of
-        // the stroke behind on the fresh pad.
-        if (drawingPad) duelPendingClear = true;
-        else setTimeout(clearPad, 180);
-      }
+      if (best !== duel.target || probs[best] <= 0.6) return;
+
+      const mult = duel.combo.hit();
+      const seconds = (performance.now() - duel.shownAt) / 1000;
+      const speed = Math.max(0, Math.round(10 * (1 - seconds / 6)));   // 10 → 0 over six seconds
+      const points = (10 + speed) * mult;
+
+      duel.score += points;
+      duel.hits++;
+      duel.bestStreak = Math.max(duel.bestStreak, duel.combo.streak);
+      duelHud.set('score', duel.score);
+      duelHud.set('hits', duel.hits);
+      duelHud.set('combo', '×' + mult);
+      duelHud.flash('score');
+      if (mult > 1) duelHud.flash('combo');
+
+      duelMsg.innerHTML = `<span style="color:var(--good)">Yes, that's a ${best}.</span> ` +
+        `<span class="muted">+${points}${mult > 1 ? ` (×${mult} streak)` : ''}` +
+        `${speed >= 7 ? ' · fast' : ''}</span>`;
+
+      padFx.burst(padSize / 2, padSize / 2, {
+        count: 14 + mult * 6, speed: 90 + mult * 30,
+        colors: mult >= 3 ? ['#ffd166', '#ff9f45'] : ['#38d39f', '#4da3ff'],
+      });
+      padFx.flash('#38d39f', 0.14);
+      arcade.sfx(mult > 1 ? 'combo' : 'hit', duel.combo.streak);
+
+      nextTarget();
+      // Wait for the pen to come up: clearing mid-stroke leaves the tail of
+      // the stroke behind on the fresh pad.
+      if (drawingPad) duelPendingClear = true;
+      else setTimeout(clearPad, 180);
     }
 
     /* ------------------------- predict, then check -------------------------
@@ -612,7 +677,17 @@
       if (duel && !duel.done) {
         const left = duel.ends - performance.now();
         duelTimer.style.width = clamp(left / (DUEL_SECONDS * 1000), 0, 1) * 100 + '%';
+        // The multiplier decays if you stall, so the HUD must show it going.
+        if (duel.combo.stale() && duel.combo.streak) {
+          duel.combo.reset();
+          duelHud.set('combo', '×1');
+        }
         if (left <= 0) endDuel();
+      }
+      if (padFx.busy) {
+        renderPad();
+        padFx.begin(pctx);
+        padFx.end(pctx, 1 / 60, padSize, padSize);
       }
       if (!running) return;
       const t0 = performance.now();

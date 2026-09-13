@@ -48,14 +48,34 @@ happens, so the site ships pre-trained models and lets you skip ahead:
 Every one of them can be thrown away with a single button to get the full from-scratch experience,
 and badges only unlock for models you trained yourself.
 
+## The games
+
+Four lessons carry a real game, each one scored against a model you trained, so getting better at
+the game and getting better at the machine learning are the same activity:
+
+| Game | Where | How it is scored |
+| --- | --- | --- |
+| **Penalty shootout** | Rocket League | Five shots at your own agent, which defends only because it wants the ball. Medals at 2, 3 and 5 goals. |
+| **Ghost time trial** | Evolve a driver | Beat the evolved champion, then your own fastest lap, replayed as a translucent ghost car. Medal times are per course. |
+| **Maze race** | Q-Learning | You and the agent leave the start square together and the shorter route wins. Gold is the shortest path a breadth-first search can find. |
+| **Digit duel** | Train a CNN | Sixty seconds, one called digit at a time, with a multiplier for consecutive hits and a bonus for drawing fast. |
+
+Personal bests and saved ghost laps live in `localStorage` under `mlbb-best-*` and `mlbb-ghost-*`,
+and travel with the progress export on the home page. Sound is on by default and every game has a
+speaker button; canvas particles and screen shake are skipped when the browser asks for reduced
+motion.
+
 ## Goals, challenges and quizzes
 
-Twenty-nine badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
+Thirty-four badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
 on the home page. None are for clicking around — each falls into one of three kinds:
 
 - **Things your model does.** Evolve a car that finishes the course, train a bot that beats the
-  scripted opponent, catch a network overfitting, score 8 in the 60-second digit duel. Loading a
-  pre-trained model does not count; badges are only for runs you trained.
+  scripted opponent, catch a network overfitting, get eight digits past your CNN in sixty seconds.
+  Loading a pre-trained model does not count; badges are only for runs you trained.
+- **Game results.** Gold on a time trial, a perfect route through the maze, five from five in the
+  shootout. These are scored against a model you trained, so a better model makes them harder,
+  not easier.
 - **Auto-graded challenges.** "Type a kernel that finds horizontal edges" is checked by correlating
   your kernel's output against a Sobel-Y reference, so any scaling or sign flip of a real edge
   detector passes and clicking the preset does not. "Solve the spiral with 8 hidden neurons or
@@ -94,6 +114,8 @@ assets/js/lib/
   digits.js   A digit dataset generated with the canvas text API
   plot.js     Canvas line charts and colour maps
   ui.js       Shared page chrome, sliders, pills, stat tiles, badges, quizzes
+  arcade.js   Game feel: personal bests, medal tiers, combo streaks, particles,
+              screen shake, countdowns and a small synthesised sound kit
   quizzes.js  The three questions and explanations for each lesson
 
 assets/js/lessons/

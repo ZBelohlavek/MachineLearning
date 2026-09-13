@@ -10,6 +10,7 @@
   'use strict';
   const { hidpi, fit, LineChart, chrome, nextLinks, slider, pills, checkbox, achieve, dpad,
           statGrid, rafLoop, mulberry32, clamp } = window.ML;
+  const arcade = window.ML.arcade;
 
   const EMPTY = 0, WALL = 1, GOAL = 2, PIT = 3, START = 4;
   const ACTIONS = [[0, -1], [1, 0], [0, 1], [-1, 0]];      // up, right, down, left
@@ -213,55 +214,180 @@
     }
 
     /* ------------------------------- race the agent ---------------------
-       You play the same maze with the arrow keys. It is a surprisingly good
-       way to feel what the Q-table is worth: the agent needed thousands of
-       steps to learn a route you can see at a glance — and you cannot beat it
-       on a maze you have not looked at either.
+       A real race rather than two numbers side by side: the agent walks its
+       learned route next to you, one square at a time, while you walk yours.
+       Fewer steps wins.
+
+       It is still the best demonstration on this page of what the Q-table is
+       worth. You can see the whole maze at a glance. The agent had to fall in
+       every pit at least once to find out it was a pit.
        -------------------------------------------------------------------- */
+    const AGENT_STEP_MS = 360;
     let racing = false, player = null, playerSteps = 0, raceMsg = '';
+    let racer = null, raceArmed = false, raceOver = false, cancelCountdown = null;
+    let racePar = null;
+    let raceWorld = 'maze';
+    const raceFx = arcade.fx();
+
+    const raceHudEl = document.getElementById('race-hud');
+    const raceHud = arcade.hud(raceHudEl, [
+      { name: 'you', label: 'your steps', value: '0' },
+      { name: 'agent', label: 'agent steps', value: '0' },
+      { name: 'par', label: 'perfect', value: '—' },
+      { name: 'best', label: 'your best', value: '—' },
+    ]);
+    arcade.soundToggle(document.getElementById('race-sound'));
+
+    const bestKey = () => 'grid-' + raceWorld;
+
+    /** The shortest safe route, by breadth-first search: the score to beat. */
+    function shortestRoute() {
+      const startIdx = grid.idx(grid.startPos.x, grid.startPos.y);
+      const dist = new Int32Array(grid.w * grid.h).fill(-1);
+      dist[startIdx] = 0;
+      const queue = [startIdx];
+      for (let head = 0; head < queue.length; head++) {
+        const cur = queue[head];
+        if (grid.cells[cur] === GOAL) return dist[cur];
+        // A pit ends the episode, so a route may not pass through one.
+        if (grid.cells[cur] === PIT) continue;
+        const cx = cur % grid.w, cy = (cur / grid.w) | 0;
+        const around = [[cx, cy - 1], [cx + 1, cy], [cx, cy + 1], [cx - 1, cy]];
+        for (const [nx, ny] of around) {
+          if (!grid.inside(nx, ny)) continue;
+          const ni = grid.idx(nx, ny);
+          if (dist[ni] !== -1 || grid.cells[ni] === WALL) continue;
+          dist[ni] = dist[cur] + 1;
+          queue.push(ni);
+        }
+      }
+      return null;
+    }
+
+    function medalTiers() {
+      if (racePar === null) return null;
+      return { gold: racePar, silver: racePar + 2, bronze: racePar + 5 };
+    }
+
+    function goalPixel() {
+      for (let i = 0; i < grid.cells.length; i++) {
+        if (grid.cells[i] === GOAL) {
+          return { x: ((i % grid.w) + 0.5) * cell, y: (((i / grid.w) | 0) + 0.5) * cell };
+        }
+      }
+      return { x: 0, y: 0 };
+    }
+
+    function showRaceBest() {
+      const b = arcade.readBest(bestKey());
+      raceHud.set('best', b === null ? '—' : b);
+      raceHud.set('par', racePar === null ? '—' : racePar);
+      const track = document.getElementById('race-medals');
+      const tiers = medalTiers();
+      if (!track || !tiers) return;
+      track.innerHTML = ['gold', 'silver', 'bronze'].map((m) =>
+        `<span class="${b !== null && b <= tiers[m] ? 'won' : ''}">` +
+        `${arcade.MEDALS[m].icon} <b>${tiers[m]} steps</b></span>`).join('') +
+        '<span>gold is the shortest route that exists</span>';
+    }
 
     function startRace() {
+      if (cancelCountdown) cancelCountdown();
       racing = true;
       running = false;
+      raceOver = false;
+      raceArmed = false;
       btnRun.textContent = '▶ Run';
       btnRun.classList.add('primary');
       player = { ...grid.startPos };
       playerSteps = 0;
-      raceMsg = ('ontouchstart' in window) ? 'Tap the arrows below to move.' : 'Use the arrow keys.';
-      updateRaceUI();
+      racePar = shortestRoute();
+      racer = { pos: { ...grid.startPos }, steps: 0, done: false, won: false, nextAt: 0 };
+      raceMsg = ('ontouchstart' in window) ? 'Tap the arrows to move.' : 'Arrow keys to move.';
+      raceHudEl.hidden = false;
+      document.getElementById('race-medals').hidden = false;
+      raceHud.set('you', '0');
+      raceHud.set('agent', '0');
+      showRaceBest();
+      raceFx.clear();
+      document.getElementById('race-readout').innerHTML =
+        `<span class="result-note">${raceMsg}</span>`;
+      cancelCountdown = arcade.countdown(document.getElementById('grid-stage'), () => {
+        raceArmed = true;
+        racer.nextAt = performance.now() + AGENT_STEP_MS;
+        cancelCountdown = null;
+      });
       draw();
+    }
+
+    /** The agent races on its learned policy: greedy, and learning nothing. */
+    function agentRaceStep() {
+      if (!racer || racer.done) return;
+      const res = grid.step(racer.pos, agent.bestA(racer.pos));
+      racer.pos = res.next;
+      racer.steps++;
+      if (res.done || racer.steps >= grid.maxSteps) {
+        racer.done = true;
+        racer.won = grid.get(racer.pos.x, racer.pos.y) === GOAL;
+      }
+      raceHud.set('agent', racer.steps);
+      settleRace();
     }
 
     function movePlayer(dir) {
-      if (!racing || !player) return;
+      if (!racing || !player || !raceArmed || raceOver || player.finished) return;
       const res = grid.step(player, dir);
       player = res.next;
       playerSteps++;
+      raceHud.set('you', playerSteps);
+      raceHud.flash('you');
       if (res.done) {
-        const won = grid.get(player.x, player.y) === GOAL;
-        if (won) {
-          raceMsg = `Goal in ${playerSteps} steps. ` +
-            (bestRoute === Infinity ? 'The agent has not finished a run yet.'
-             : playerSteps < bestRoute ? `You beat the agent's best of ${bestRoute}.`
-             : `The agent's best is ${bestRoute}.`);
-          if (bestRoute !== Infinity && playerSteps < bestRoute) {
-            achieve('grid-beaten', `${playerSteps} steps against the agent's ${bestRoute}`);
-          }
-        } else raceMsg = `You fell in a pit after ${playerSteps} steps. The agent has done that too.`;
-        racing = false;
+        player.finished = true;
+        player.won = grid.get(player.x, player.y) === GOAL;
+        if (player.won) {
+          const g = goalPixel();
+          raceFx.burst(g.x, g.y, { count: 34, speed: 130, colors: ['#38d39f', '#ffd166'], gravity: 90 });
+          arcade.sfx('score');
+        } else {
+          raceFx.shake(5);
+          arcade.sfx('fail');
+        }
       }
-      updateRaceUI();
+      settleRace();
       draw();
     }
 
-    function updateRaceUI() {
+    /** Decided once the player's run is over and the agent has stopped walking. */
+    function settleRace() {
+      if (raceOver || !player || !player.finished) return;
+      if (!racer.done && racer.steps < grid.maxSteps) return;   // let the agent finish too
+      raceOver = true;
+      racing = false;
+
       const el = document.getElementById('race-readout');
-      if (!el) return;
-      el.innerHTML = player
-        ? `<span class="chip">your steps <b>${playerSteps}</b></span>` +
-          `<span class="chip">agent's best <b>${bestRoute === Infinity ? '–' : bestRoute}</b></span>` +
-          (raceMsg ? ` <span style="color:var(--text-dim)">${raceMsg}</span>` : '')
-        : '';
+      if (!player.won) {
+        el.innerHTML = `<span class="result-note">You fell in a pit after ${playerSteps} steps. ` +
+          'The agent has done that too, a few thousand times.</span>';
+        return;
+      }
+
+      const tiers = medalTiers();
+      const beatAgent = racer.won && playerSteps < racer.steps;
+      const res = arcade.resultCard(playerSteps, {
+        tiers: tiers || undefined, lower: true, bestKey: bestKey(),
+        format: (v) => v + ' steps',
+        note: !racer.won ? 'The agent did not finish this one.'
+              : beatAgent ? `You beat the agent's ${racer.steps}.`
+              : playerSteps === racer.steps ? `A dead heat at ${racer.steps} steps each.`
+              : `The agent got round in ${racer.steps}.`,
+      });
+      el.innerHTML = res.html;
+      showRaceBest();
+      arcade.sfx(res.tier === 'gold' ? 'win' : 'goal');
+      if (bestRoute !== Infinity && playerSteps < bestRoute) {
+        achieve('grid-beaten', `${playerSteps} steps against the agent's ${bestRoute}`);
+      }
+      if (res.tier === 'gold') achieve('grid-perfect', `${playerSteps} steps, the shortest route there is`);
     }
 
     window.addEventListener('keydown', (e) => {
@@ -380,6 +506,21 @@
         ctx.fillText('YOU', player.x * cell + cell / 2, player.y * cell + cell * 0.78);
       }
 
+      // The agent's racer: the same square-by-square walk, on its learned policy.
+      if (racer) {
+        ctx.save();
+        ctx.strokeStyle = racer.done && !racer.won ? '#ff6b6b' : '#38d39f';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([4, 3]);
+        ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 8;
+        ctx.strokeRect(racer.pos.x * cell + 4, racer.pos.y * cell + 4, cell - 8, cell - 8);
+        ctx.restore();
+        ctx.fillStyle = racer.done && !racer.won ? '#ff6b6b' : '#38d39f';
+        ctx.font = `${cell * 0.22}px ui-monospace, monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('BOT', racer.pos.x * cell + cell / 2, racer.pos.y * cell + cell * 0.22);
+      }
+
       // the agent, sliding between squares
       const ax = (prevPos.x + (pos.x - prevPos.x) * animT + 0.5) * cell;
       const ay = (prevPos.y + (pos.y - prevPos.y) * animT + 0.5) * cell;
@@ -429,7 +570,13 @@
       { value: 'rooms', label: 'Two rooms' },
       { value: 'open', label: 'Open field' },
       { value: 'random', label: 'Random' },
-    ], 'maze', (v) => { grid.loadPreset(v); hardReset(); });
+    ], 'maze', (v) => {
+      grid.loadPreset(v);
+      raceWorld = v;
+      racePar = shortestRoute();
+      hardReset();
+      showRaceBest();
+    });
 
     /* Hovering a square shows what the agent actually believes about it: the
        four numbers behind the triangles, which are otherwise only a colour. */
@@ -543,8 +690,11 @@
 
     function hardReset() {
       agent.reset();
-      player = null; racing = false; raceMsg = '';
-      updateRaceUI();
+      player = null; racer = null; racing = false; raceOver = false; raceArmed = false;
+      if (cancelCountdown) { cancelCountdown(); cancelCountdown = null; }
+      raceHudEl.hidden = true;
+      document.getElementById('race-medals').hidden = true;
+      document.getElementById('race-readout').innerHTML = '';
       agent.eps = 0.3;
       episode = 0; totalSteps = 0; bestRoute = Infinity;
       lastUpdate = null;
@@ -571,8 +721,20 @@
         updateStats();
         chart.draw(); chartR.draw();
       }
+      // The agent's half of the race runs on a clock so you can watch it think.
+      if (racing && raceArmed && racer && !racer.done) {
+        const now = performance.now();
+        if (now >= racer.nextAt) {
+          racer.nextAt = now + AGENT_STEP_MS;
+          agentRaceStep();
+        }
+      }
       animT = Math.min(1, animT + dt * 9);
       draw();
+      if (raceFx.busy) {
+        raceFx.begin(ctx);
+        raceFx.end(ctx, dt, ctx._cssW, ctx._cssH);
+      }
     }).start();
 
     newEpisode();

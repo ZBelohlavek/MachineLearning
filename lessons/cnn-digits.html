@@ -35,16 +35,13 @@
   table.conf { border-collapse: collapse; font-family: var(--mono); font-size: .72rem; width: 100%; }
   table.conf th { color: var(--text-mute); font-weight: 500; padding: 3px; }
   table.conf td { text-align: center; padding: 4px 3px; color: var(--text); border-radius: 3px; }
-  #duel-panel.live { border-color: rgba(56,211,159,.55); }
-  .duel-row { display: flex; align-items: center; gap: 18px; }
+  .duel-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
   .duel-target {
     width: 78px; height: 78px; flex: none; border-radius: 14px;
     display: grid; place-items: center; font-size: 2.6rem; font-weight: 700;
     background: rgba(77,163,255,.12); border: 1px solid rgba(77,163,255,.4); color: #cfe6ff;
   }
-  .duel-score { font-family: var(--mono); font-size: 1.6rem; color: var(--text); }
-  .duel-score small { font-size: .8rem; color: var(--text-mute); font-family: var(--sans); }
-  .duel-timer { width: 160px; height: 8px; background: var(--line-soft); border-radius: 5px; margin-top: 8px; overflow: hidden; }
+  .duel-timer { width: 100%; height: 8px; background: var(--line-soft); border-radius: 5px; margin-top: 8px; overflow: hidden; }
   .duel-timer i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--good), var(--warn)); }
 </style>
 </head>
@@ -180,28 +177,30 @@
         </div>
         <div id="pad-verdict" style="margin-top:14px;font-size:1rem"></div>
       </div>
-      <div class="panel" id="duel-panel">
+      <div class="panel game-panel" id="duel-panel">
         <div class="panel-title">
-          <h3>Digit duel · 60 seconds</h3>
-          <span class="hint" id="duel-best"></span>
+          <h3><span class="game-tag">game</span> Digit duel</h3>
+          <span class="hint">60 seconds</span>
         </div>
         <p class="muted" style="font-size:.86rem;margin-bottom:12px">
-          The network names a digit, you draw it. Anything it recognises with over 60% confidence scores a
-          point. Your handwriting looks nothing like its training data, which is what makes this an actual
-          test rather than a victory lap.
+          The network calls a digit, you draw it. Anything it recognises above 60% confidence scores,
+          and landing them back to back builds a multiplier. Draw fast: the quicker it reads your
+          digit, the more the hit is worth.
         </p>
         <div class="duel-row">
           <div class="duel-target" id="duel-target">–</div>
-          <div>
-            <div class="duel-score"><span id="duel-score">0</span> <small>points</small></div>
+          <div style="flex:1;min-width:0">
+            <div id="duel-hud"></div>
             <div class="duel-timer"><i id="duel-timer"></i></div>
           </div>
         </div>
         <div class="controls" style="margin-top:12px">
           <button id="btn-duel" class="primary">Start the duel</button>
-          <button id="btn-duel-skip" class="small">Skip this digit</button>
+          <button id="btn-duel-skip" class="small">Skip (−3s)</button>
+          <span id="duel-sound"></span>
         </div>
-        <div id="duel-msg" style="margin-top:10px;font-size:.9rem;color:var(--text-dim);min-height:1.4em"></div>
+        <div id="duel-msg" class="result-line"></div>
+        <div class="medal-track" id="duel-medals"></div>
       </div>
 
       <div class="panel">
@@ -286,6 +285,7 @@
 <script src="../assets/models/cnn-digits.js"></script>
 <script src="../assets/js/lib/plot.js"></script>
 <script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/arcade.js"></script>
 <script src="../assets/js/lib/quizzes.js"></script>
 <script src="../assets/js/lessons/cnn-digits.js"></script>
 </body>

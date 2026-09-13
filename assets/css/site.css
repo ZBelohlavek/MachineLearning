@@ -633,3 +633,189 @@ kbd {
 @media (hover: none) and (pointer: coarse) {
   .kbd-hint { display: none; }
 }
+
+/* ==========================================================================
+   Arcade — shared game feel: HUDs, medals, countdowns, result cards.
+   ========================================================================== */
+
+/* `hidden` must beat the display rules below, or a panel that is meant to stay
+   out of the way until a game starts shows up on page load. */
+[hidden] { display: none !important; }
+
+.arcade-hud {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.hud-cell {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  min-width: 0;
+}
+.hud-cell.wide { grid-column: span 2; }
+.hud-label {
+  display: block;
+  font-size: .66rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud-value {
+  display: block;
+  font-family: var(--mono);
+  font-size: 1.32rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.25;
+}
+.hud-value.small { font-size: .95rem; }
+.hud-value .sub { font-size: .72rem; color: var(--text-mute); }
+
+@keyframes hud-pop-good {
+  0%   { transform: scale(1);    color: var(--good); }
+  35%  { transform: scale(1.28); color: var(--good); }
+  100% { transform: scale(1);    color: var(--text); }
+}
+@keyframes hud-pop-bad {
+  0%   { transform: scale(1);    color: var(--bad); }
+  35%  { transform: scale(1.12); color: var(--bad); }
+  100% { transform: scale(1);    color: var(--text); }
+}
+.hud-value.flash-good { animation: hud-pop-good .45s ease-out; transform-origin: left center; }
+.hud-value.flash-bad  { animation: hud-pop-bad .45s ease-out;  transform-origin: left center; }
+
+/* ------------------------------- medals ---------------------------------- */
+
+.medal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.medal-chip.gold   { color: #ffd166; border-color: rgba(255, 209, 102, .45); background: rgba(255, 209, 102, .1); }
+.medal-chip.silver { color: #c9d6e8; border-color: rgba(201, 214, 232, .4);  background: rgba(201, 214, 232, .08); }
+.medal-chip.bronze { color: #e08a53; border-color: rgba(224, 138, 83, .4);   background: rgba(224, 138, 83, .1); }
+
+.medal-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: .78rem;
+  color: var(--text-mute);
+  margin-top: 10px;
+}
+.medal-track b { color: var(--text-dim); font-weight: 600; }
+.medal-track .won { color: var(--text); }
+
+/* ------------------------------ countdown -------------------------------- */
+
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: clamp(3rem, 14vw, 6rem);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 6px 30px rgba(0, 0, 0, .7);
+  pointer-events: none;
+  z-index: 4;
+}
+.countdown.go { color: var(--good); }
+@keyframes count-pop {
+  0%   { transform: scale(.5); opacity: 0; }
+  25%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1);   opacity: .15; }
+}
+.countdown.pop { animation: count-pop .62s ease-out forwards; }
+
+/* A canvas panel that hosts a countdown needs a positioning context. */
+.stage { position: relative; }
+
+/* ----------------------------- result cards ------------------------------ */
+
+.result-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  min-height: 28px;
+}
+.result-score {
+  font-family: var(--mono);
+  font-size: 1.15rem;
+  color: var(--text);
+}
+.result-new {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #0b0f17;
+  background: var(--good);
+}
+.result-note { color: var(--text-dim); font-size: .88rem; }
+
+/* ----------------------------- sound toggle ------------------------------ */
+
+.sound-toggle {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: 0 0 auto;
+  font-size: .95rem;
+  line-height: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.sound-toggle:hover { border-color: var(--accent); }
+.sound-toggle.off { opacity: .55; }
+
+/* ------------------------------ game panels ------------------------------ */
+
+.game-panel {
+  border-color: rgba(124, 92, 255, .35);
+  box-shadow: 0 0 0 1px rgba(124, 92, 255, .08), var(--shadow);
+}
+.game-panel.live {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(77, 163, 255, .25), 0 0 34px rgba(77, 163, 255, .16);
+}
+.game-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--accent-2);
+  border: 1px solid rgba(124, 92, 255, .4);
+  background: rgba(124, 92, 255, .1);
+}
+
+@media (max-width: 560px) {
+  .arcade-hud { grid-template-columns: repeat(auto-fit, minmax(74px, 1fr)); }
+  .hud-value { font-size: 1.12rem; }
+}

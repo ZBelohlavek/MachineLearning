@@ -12,6 +12,7 @@
     hidpi, fit, LineChart, diverging, heat, softmax, argmax, sampleFrom, clamp, MLP,
     chrome, nextLinks, slider, pills, checkbox, statGrid, rafLoop, achieve, dpad,
   } = window.ML;
+  const arcade = window.ML.arcade;
 
   const COL = {
     blue: '#4da3ff', blueDark: '#1f5c9e',
@@ -249,6 +250,7 @@
           }
           a.spread = this.spreadOverride ?? 1;
           a.reset();
+          if (this.placement) this.placement(a);
           this.trail.length = 0;
           this.tick = 0;
         }
@@ -645,9 +647,18 @@
     const match = new Match(document.getElementById('train-canvas'), { rewards, trainer, mode: 'selfplay' });
     bindKeys(match, match.canvas, () => match.mode === 'human');
 
+    const matchFx = arcade.fx();
     match.onGoal = (team, mode) => {
-      if (mode === 'human' && team === 1) {
-        achieve('rocket-human', 'You scored against an agent you trained');
+      // A goal is the thing the whole page is about, so it gets to be loud.
+      const c = match.canvas;
+      matchFx.burst(TX(c, team === 0 ? F.halfW - 6 : -F.halfW + 6), TY(c, 0), {
+        count: 34, speed: 170, gravity: 110,
+        colors: team === 0 ? ['#4da3ff', '#ffd166'] : ['#ff9f45', '#ffd166'],
+      });
+      matchFx.shake(6);
+      if (mode === 'human') {
+        arcade.sfx(team === 1 ? 'goal' : 'fail');
+        if (team === 1) achieve('rocket-human', 'You scored against an agent you trained');
       }
     };
 
@@ -981,6 +992,169 @@
       format: (v) => v.toFixed(2) + '×', onInput: (v) => { match.speed = v; },
     });
 
+
+    /* ==================================================================
+       PANEL 5b — the penalty shootout
+
+       Five shots at the left-hand goal with the trained agent in front of it.
+       The agent has no idea what a goalkeeper is; it was trained to attack the
+       other net, and defending is a side effect of wanting the ball. That is
+       the whole joke of this game, and it is also a real lesson: the behaviour
+       you get is the behaviour the reward paid for, not the behaviour the
+       situation seems to call for.
+       ================================================================== */
+    const SHOTS = 5;
+    const SHOT_SECONDS = 12;
+    const SHOOTOUT_TIERS = { gold: 5, silver: 3, bronze: 2 };
+    const shootFx = arcade.fx();
+
+    const shootout = new Match(document.getElementById('shootout-canvas'),
+      { rewards, trainer, mode: 'human' });
+    shootout.greedy = true;          // the keeper plays its best guess, not a dice roll
+    let shoot = null;                // null until a run is started
+    let cancelShotCountdown = null;
+
+    // Claim the arrow keys for the whole run, countdown included: otherwise
+    // holding throttle while the lights count down scrolls the page instead.
+    bindKeys(shootout, shootout.canvas, () => !!shoot && !shoot.over);
+    dpad(document.getElementById('shootout-pad'), { keys: shootout.keys });
+    arcade.soundToggle(document.getElementById('shootout-sound'));
+
+    const shootHud = arcade.hud(document.getElementById('shootout-hud'), [
+      { name: 'shot', label: 'shot', value: '–' },
+      { name: 'scored', label: 'scored', value: '0' },
+      { name: 'clock', label: 'clock', value: '–' },
+      { name: 'best', label: 'best', value: '—' },
+    ]);
+
+    /**
+     * Line the pieces up for one attempt: ball near the target goal, you behind
+     * it facing the right way, keeper on its line. Identical every shot, so the
+     * five attempts are comparable and the only variable is you.
+     */
+    function placeShot(a) {
+      a.ball.x = -18; a.ball.y = (a.rand() - 0.5) * 34;
+      a.ball.vx = 0; a.ball.vy = 0;
+      const you = a.cars[1];          // orange, attacking -x
+      you.x = 16; you.y = a.ball.y * 0.5;
+      you.vx = 0; you.vy = 0;
+      you.angle = Math.PI;            // pointing at the goal you are attacking
+      you.lastTouch = 0;
+      const keeper = a.cars[0];       // blue, defending -x because it attacks +x
+      keeper.x = -F.halfW + 16; keeper.y = 0;
+      keeper.vx = 0; keeper.vy = 0;
+      keeper.angle = 0;
+      keeper.lastTouch = 0;
+      a.done = false;
+      a.scorer = -1;
+    }
+
+    function showShootoutBest() {
+      const b = arcade.readBest('rocket-shootout');
+      shootHud.set('best', b === null ? '—' : `${b}/${SHOTS}`);
+      const track = document.getElementById('shootout-medals');
+      if (!track) return;
+      track.innerHTML = ['gold', 'silver', 'bronze'].map((m) =>
+        `<span class="${b !== null && b >= SHOOTOUT_TIERS[m] ? 'won' : ''}">` +
+        `${arcade.MEDALS[m].icon} <b>${SHOOTOUT_TIERS[m]}/${SHOTS}</b></span>`).join('') +
+        '<span>a better-trained agent is a harder keeper</span>';
+    }
+
+    function startShootout() {
+      // Restarting during the lights must not leave the old countdown running.
+      if (cancelShotCountdown) { cancelShotCountdown(); cancelShotCountdown = null; }
+      shoot = { shot: 0, scored: 0, left: 0, live: false, over: false };
+      shootout.score = [0, 0];
+      shootFx.clear();
+      document.getElementById('shootout-result').innerHTML = '';
+      document.getElementById('btn-shootout').textContent = 'Restart shootout';
+      document.getElementById('shootout-panel').classList.add('live');
+      shootHud.set('scored', '0');
+      showShootoutBest();
+      nextShot();
+    }
+
+    function nextShot() {
+      if (!shoot) return;
+      if (shoot.shot >= SHOTS) { endShootout(); return; }
+      shoot.shot++;
+      shoot.left = SHOT_SECONDS;
+      shoot.live = false;
+      shootHud.set('shot', `${shoot.shot}/${SHOTS}`);
+      shootHud.set('clock', SHOT_SECONDS.toFixed(1));
+      shootout.arena.reset();
+      placeShot(shootout.arena);
+      shootout.trail.length = 0;
+      shootout.render();
+      cancelShotCountdown = arcade.countdown(document.getElementById('shootout-stage'), () => {
+        cancelShotCountdown = null;
+        if (shoot) shoot.live = true;
+      }, { words: ['3', '2', '1', 'SHOOT'], stepMs: 520 });
+    }
+
+    /** Called when a shot ends, whichever way it went. */
+    function settleShot(outcome) {
+      if (!shoot || !shoot.live) return;
+      shoot.live = false;
+      const res = document.getElementById('shootout-result');
+      if (outcome === 'goal') {
+        shoot.scored++;
+        shootHud.set('scored', shoot.scored);
+        shootHud.flash('scored');
+        const c = shootout.canvas;
+        shootFx.burst(TX(c, -F.halfW + 6), TY(c, 0),
+          { count: 46, speed: 210, colors: ['#38d39f', '#ffd166', '#4da3ff'], gravity: 120 });
+        shootFx.shake(9);
+        shootFx.flash('#38d39f', 0.24);
+        arcade.sfx('goal');
+        res.innerHTML = '<span class="result-note" style="color:var(--good)">Goal.</span>';
+      } else if (outcome === 'conceded') {
+        shootFx.shake(6);
+        arcade.sfx('fail');
+        res.innerHTML = '<span class="result-note">The keeper took it the other way and scored. ' +
+          'That is what it was trained to do.</span>';
+      } else {
+        arcade.sfx('tick');
+        res.innerHTML = '<span class="result-note">Out of time.</span>';
+      }
+      setTimeout(() => { if (shoot && !shoot.over) nextShot(); }, 1100);
+    }
+
+    function endShootout() {
+      shoot.over = true;
+      shoot.live = false;
+      if (cancelShotCountdown) { cancelShotCountdown(); cancelShotCountdown = null; }
+      document.getElementById('shootout-panel').classList.remove('live');
+      shootHud.set('clock', '–');
+      shootHud.set('shot', '–');
+      const res = arcade.resultCard(shoot.scored, {
+        tiers: SHOOTOUT_TIERS, bestKey: 'rocket-shootout',
+        format: (v) => `${v}/${SHOTS}`,
+        note: shoot.scored === SHOTS ? 'Every one. The keeper never got near it.'
+              : shoot.scored === 0 ? 'None. Try approaching from behind the ball rather than beside it.'
+              : 'The keeper is only as good as the policy you trained.',
+      });
+      document.getElementById('shootout-result').innerHTML = res.html;
+      showShootoutBest();
+      arcade.sfx(res.tier === 'gold' ? 'win' : shoot.scored > 0 ? 'score' : 'fail');
+      if (shoot.scored >= 1) achieve('rocket-shootout', `${shoot.scored} of ${SHOTS} past your own agent`);
+      if (shoot.scored === SHOTS) achieve('rocket-shootout-perfect', `${SHOTS} from ${SHOTS}`);
+      document.getElementById('btn-shootout').textContent = '▶ Take five shots';
+    }
+
+    shootout.onGoal = (team) => {
+      if (!shoot || !shoot.live) return;
+      settleShot(team === 1 ? 'goal' : 'conceded');
+    };
+    shootout.placement = placeShot;
+
+    document.getElementById('btn-shootout').addEventListener('click', startShootout);
+    showShootoutBest();
+    shootout.render();
+
+    // handy from the console, and used by the tests to force a shot on goal
+    window.__rocket = { shootout, match, get shoot() { return shoot; } };
+
     /* ==================================================================
        main loop: train a slice, then draw everything
        ================================================================== */
@@ -1030,8 +1204,31 @@
       if (showMatch) {
         match.update(dt);
         match.render();
+        if (matchFx.busy) {
+          const mctx = match.canvas._ctx;
+          matchFx.begin(mctx);
+          matchFx.end(mctx, dt, mctx._cssW, mctx._cssH);
+        }
         drawNet();
         drawPolicyReadout();
+      }
+
+      // The shootout arena only runs while a shootout is on, or while its
+      // celebration is still playing, so an idle page pays nothing for it.
+      if (shoot && !shoot.over) {
+        if (shoot.live) {
+          shoot.left -= dt;
+          shootHud.set('clock', Math.max(0, shoot.left).toFixed(1));
+          if (shoot.left <= 0) settleShot('timeout');
+        }
+        shootout.update(shoot.live ? dt : 0);
+        shootout.render();
+      }
+      if (shootFx.busy) {
+        const sctx = shootout.canvas._ctx;
+        if (!shoot || shoot.over) shootout.render();
+        shootFx.begin(sctx);
+        shootFx.end(sctx, dt, sctx._cssW, sctx._cssH);
       }
     });
     loop.start();

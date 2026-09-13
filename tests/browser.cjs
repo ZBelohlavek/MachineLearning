@@ -169,12 +169,15 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     check('racer · evolution makes progress', parseInt(stats.generation, 10) > 2 && parseFloat(stats.best) > 20,
           `(gen ${stats.generation}, best ${stats.best})`);
     await page.click('#mode-pills .pill:text-is("Race the champion")');
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(2800);          // the countdown holds both cars
     await page.keyboard.down('ArrowUp');
     await page.waitForTimeout(1800);
     await page.keyboard.up('ArrowUp');
-    const race = await page.textContent('#race-readout');
-    check('racer · you can race the champion', /champion/.test(race) && /\d+%/.test(race));
+    const hud = await page.evaluate(() =>
+      [...document.querySelectorAll('#race-hud .hud-value')].map(e => e.textContent));
+    check('racer · you can race the champion',
+          parseFloat(hud[0]) > 0 && /%/.test(hud[1]) && /%/.test(hud[2]),
+          `(t=${hud[0]}s, you ${hud[1]}, champion ${hud[2]})`);
     await page.click('#track-presets .pill:text-is("Hairpin")');
     await page.waitForTimeout(600);
     check('racer · switching track restarts evolution', true);
@@ -324,13 +327,14 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto';
       const el = document.querySelector('#grid-canvas'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 60); });
     await page.click('#btn-race');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(2800);          // the race now starts on a countdown
     const buttons = await page.evaluate(() => document.querySelectorAll('#race-pad .dpad-btn').length);
     for (let i = 0; i < 3; i++) { await page.tap('#race-pad .dpad-btn.right'); await page.waitForTimeout(120); }
-    const readout = await page.textContent('#race-readout');
+    const steps = await page.evaluate(() =>
+      document.querySelectorAll('#race-hud .hud-value')[0].textContent);
     check('touch · the maze is playable with the on-screen pad',
-          buttons === 4 && /your steps\s*3/.test(readout.replace(/<[^>]*>/g, '')),
-          `(${buttons} buttons)`);
+          buttons === 4 && steps === '3',
+          `(${buttons} buttons, ${steps} steps)`);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2);
     check('touch · the page still fits a 390px screen', overflow);
     await page.close();
@@ -421,6 +425,97 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.click('#btn-train');
     const eps = await page.evaluate(() => window.__trainer.episodes);
     check('rocket · trains either way', eps > 20, `(${eps} episodes)`);
+    await page.close();
+  }
+
+  /* ---- the games: HUDs, countdowns and personal bests ---- */
+  {
+    const page = await open('lessons/cnn-digits.html');
+    check('duel · the HUD has four readouts',
+          (await page.locator('#duel-hud .hud-cell').count()) === 4);
+    check('duel · medal thresholds are shown up front',
+          /250/.test(await page.textContent('#duel-medals')));
+    await page.click('#btn-duel');
+    // The bar is repainted on the next animation frame, so both reads have to
+    // come after one; without the waits this passes or fails on timing alone.
+    const width = () => page.evaluate(() => parseFloat(document.getElementById('duel-timer').style.width));
+    await page.waitForTimeout(150);
+    const before = await width();
+    await page.click('#btn-duel-skip');
+    await page.waitForTimeout(150);
+    const after = await width();
+    check('duel · skipping a digit costs clock', after < before - 3,
+          `(${before.toFixed(1)}% → ${after.toFixed(1)}%)`);
+    await page.close();
+  }
+
+  {
+    const page = await open('lessons/gridworld.html');
+    check('maze race · the HUD stays hidden until a race starts',
+          await page.locator('#race-hud').isHidden());
+    await page.click('#btn-race');
+    check('maze race · a countdown appears over the grid',
+          (await page.locator('#grid-stage .countdown').count()) === 1);
+    const par = await page.evaluate(() =>
+      document.querySelectorAll('#race-hud .hud-value')[2].textContent);
+    check('maze race · the shortest route is computed as par', +par > 0, `(par ${par})`);
+    const held = await page.evaluate(() =>
+      document.querySelectorAll('#race-hud .hud-value')[1].textContent);
+    await page.waitForTimeout(700);
+    const stillHeld = await page.evaluate(() =>
+      document.querySelectorAll('#race-hud .hud-value')[1].textContent);
+    check('maze race · the agent waits for the countdown', held === '0' && stillHeld === '0');
+    await page.waitForTimeout(2500);
+    const moved = await page.evaluate(() =>
+      document.querySelectorAll('#race-hud .hud-value')[1].textContent);
+    check('maze race · the agent then races alongside you', +moved > 0, `(${moved} steps)`);
+    await page.close();
+  }
+
+  {
+    const page = await open('lessons/evolve-a-driver.html');
+    await page.evaluate(() => {
+      const path = [];
+      for (let i = 0; i < 200; i++) path.push(30 + i * 0.4, 40);
+      localStorage.setItem('mlbb-ghost-circuit', JSON.stringify({ path, time: 15.5 }));
+      localStorage.setItem('mlbb-best-racer-circuit', '15.5');
+    });
+    await page.reload();
+    await page.waitForTimeout(400);
+    check('time trial · a saved lap is offered as a ghost',
+          /ghost is on track/.test(await page.textContent('#race-medals')));
+    await page.click('text=Race the champion');
+    const t0 = await page.evaluate(() =>
+      document.querySelectorAll('#race-hud .hud-value')[0].textContent);
+    await page.waitForTimeout(700);
+    const t1 = await page.evaluate(() =>
+      document.querySelectorAll('#race-hud .hud-value')[0].textContent);
+    check('time trial · the clock is held during the countdown', t0 === '0.00' && t1 === '0.00');
+    await page.waitForTimeout(2400);
+    const t2 = await page.evaluate(() =>
+      document.querySelectorAll('#race-hud .hud-value')[0].textContent);
+    check('time trial · the clock runs once the lights go out', +t2 > 0, `(${t2}s)`);
+    await page.click('text=Snake');
+    await page.waitForTimeout(300);
+    check('time trial · each course keeps its own ghost and best',
+          /finish once/.test(await page.textContent('#race-medals')));
+    await page.close();
+  }
+
+  {
+    const page = await open('lessons/rocket-league.html');
+    await page.click('#btn-shootout');
+    await page.waitForTimeout(2600);
+    // put the ball over the line the player is attacking
+    await page.evaluate(() => {
+      const a = window.__rocket.shootout.arena;
+      a.ball.x = -96; a.ball.y = 0; a.ball.vx = -60; a.ball.vy = 0;
+    });
+    await page.waitForTimeout(900);
+    const scored = await page.evaluate(() =>
+      document.querySelectorAll('#shootout-hud .hud-value')[1].textContent);
+    check('shootout · a goal for the player is counted', scored === '1');
+    check('shootout · and is announced', /Goal/.test(await page.textContent('#shootout-result')));
     await page.close();
   }
 

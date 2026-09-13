@@ -243,6 +243,45 @@ for (const cfg of [
     `after ${t.episodes} episodes (${t.updates} updates)`);
 }
 
+/* ---------------------------------------------------------------- arcade.js
+   The game-feel layer has real logic in it — medal thresholds, combo decay,
+   personal bests — and it is the sort of thing that breaks quietly. */
+{
+  const arcade = require('../assets/js/lib/arcade.js');
+  const cases = [];
+
+  cases.push(['medal: a score at the gold threshold is gold',
+    arcade.medalFor(250, { gold: 250, silver: 140, bronze: 60 }) === 'gold']);
+  cases.push(['medal: below every tier earns nothing',
+    arcade.medalFor(12, { gold: 250, silver: 140, bronze: 60 }) === null]);
+  cases.push(['medal: for times, lower wins',
+    arcade.medalFor(12.5, { gold: 13, silver: 17, bronze: 24 }, true) === 'gold']);
+  cases.push(['medal: a slow time still takes bronze',
+    arcade.medalFor(23, { gold: 13, silver: 17, bronze: 24 }, true) === 'bronze']);
+
+  const c = arcade.combo({ windowMs: 5000, cap: 5 });
+  const first = c.hit(1000);
+  c.hit(1500);
+  const third = c.hit(2000);
+  cases.push(['combo: the first hit is worth ×1', first === 1]);
+  cases.push(['combo: the streak raises the multiplier', third === 2 && c.streak === 3]);
+  c.hit(60000);
+  cases.push(['combo: a long gap resets the streak', c.streak === 1]);
+  c.miss();
+  cases.push(['combo: a miss resets the streak', c.streak === 0]);
+
+  const f = arcade.fx();
+  f.burst(0, 0, { count: 6 });
+  cases.push(['fx: a burst makes the field busy', f.busy === true]);
+  f.clear();
+  cases.push(['fx: clear empties it', f.busy === false]);
+
+  for (const [name, ok] of cases) {
+    if (!ok) failures++;
+    console.log(`${ok ? '  ok  ' : ' FAIL '} ${('arcade.js  ' + name).padEnd(60)}`);
+  }
+}
+
 console.log(failures === 0
   ? '\nAll checks passed.'
   : `\n${failures} check(s) failed.`);

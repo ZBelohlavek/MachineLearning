@@ -80,6 +80,42 @@
   <div id="capstone-card"></div>
 
   <div class="section">
+    <h2>Or just play something</h2>
+    <p>
+      Four of the lessons have a proper game buried in them, with a clock, a score and a personal
+      best that sticks around. All four are scored against a model you trained, so getting better at
+      the game and getting better at the machine learning are the same activity. Sound is on by
+      default; there's a speaker button next to every one of them.
+    </p>
+    <div class="pitch">
+      <div class="panel">
+        <b><a href="lessons/rocket-league.html">Penalty shootout</a></b>
+        <p class="mb0" style="font-size:.9rem">Five shots at your own agent. It was never taught to
+        keep goal, so you're really playing against its urge to grab the ball and run the other way.
+        A better-trained agent is a harder keeper.</p>
+      </div>
+      <div class="panel">
+        <b><a href="lessons/evolve-a-driver.html">Ghost time trial</a></b>
+        <p class="mb0" style="font-size:.9rem">Beat the evolved champion round the track, then keep
+        beating your own ghost. Your fastest lap is saved and replayed as a translucent car on every
+        run after it. Gold times are tight.</p>
+      </div>
+      <div class="panel">
+        <b><a href="lessons/gridworld.html">Maze race</a></b>
+        <p class="mb0" style="font-size:.9rem">You and the Q-learning agent leave the start square
+        together and the shorter route wins. Gold is the shortest path that exists, which the agent
+        is also trying to find.</p>
+      </div>
+      <div class="panel">
+        <b><a href="lessons/cnn-digits.html">Digit duel</a></b>
+        <p class="mb0" style="font-size:.9rem">Sixty seconds, one digit called at a time, and a
+        multiplier that climbs while you keep landing them. Draw fast. Your handwriting is nothing
+        like the network's training data, which is the point.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
     <h2>Where to start</h2>
     <p>
       In order is best; each lesson leans on the one before it. But most people arrive wanting one
@@ -131,6 +167,7 @@ python3 -m http.server 8000     # then open http://localhost:8000</code></pre>
 <script src="assets/js/lib/nn.js"></script>
 <script src="assets/js/lib/plot.js"></script>
 <script src="assets/js/lib/ui.js"></script>
+<script src="assets/js/lib/arcade.js"></script>
 <script src="assets/js/home.js"></script>
 <script>
 /* A small animated arena on the hero: a scripted bot chasing a ball, so the
