@@ -115,20 +115,34 @@ header.site .wrap {
   gap: 18px;
   height: 62px;
 }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text);
+         letter-spacing: -.02em; white-space: nowrap; flex: 0 0 auto; }
 .brand:hover { text-decoration: none; }
 .brand .dot {
   width: 24px; height: 24px; border-radius: 7px;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow: 0 0 18px rgba(77, 163, 255, .5);
 }
-nav.site-nav { display: flex; gap: 4px; flex-wrap: wrap; }
+/* The nav grows every time a lesson is added, so it must never wrap: a second
+   row has nowhere to go inside a fixed-height header and lands on the page.
+   It scrolls sideways instead, at every width. */
+nav.site-nav {
+  display: flex;
+  gap: 3px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-width: 0;
+}
+nav.site-nav::-webkit-scrollbar { display: none; }
 nav.site-nav a {
   color: var(--text-dim);
-  padding: 7px 11px;
+  padding: 7px 9px;
   border-radius: 8px;
-  font-size: .9rem;
+  font-size: .86rem;
   font-weight: 500;
+  white-space: nowrap;
+  flex: none;
 }
 nav.site-nav a:hover { background: var(--panel); color: var(--text); text-decoration: none; }
 nav.site-nav a.active { background: var(--panel-2); color: var(--text); }

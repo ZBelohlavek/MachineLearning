@@ -293,6 +293,45 @@
         },
       ],
     },
+    wordle: {
+      id: 'wordle', badge: 'quiz-wordle',
+      title: 'Check yourself \u00b7 information',
+      questions: [
+        {
+          q: 'A guess comes back with the same colouring no matter which of the remaining words turns out to be the answer. How many bits did it buy you?',
+          options: [
+            'Five, one per letter',
+            'Zero',
+            'It depends how many letters came back green',
+            'One, because you eliminated the guess itself',
+          ],
+          answer: 1,
+          why: 'Information is the removal of uncertainty, so a result you could have predicted in advance carries none of it. Every candidate lands in the same bucket, the list is exactly as long as before, and log\u2082(1) is 0. This is why a word full of repeated letters scores so badly: the second V in VIVID asks a question the first V already answered.',
+        },
+        {
+          q: 'Partway through a game the solver plays a word that the colours have already ruled out \u2014 a word that cannot possibly be the answer. Why would it do that?',
+          options: [
+            'A bug: it should only ever guess words that can still win',
+            'Because that word splits the surviving candidates better than any word that can win',
+            'To use up a turn while it thinks',
+            'Because unusual letters are always worth trying',
+          ],
+          answer: 1,
+          why: 'Winning this turn and learning the most are two different goals, and they usually point at different words. Giving up a small chance of finishing now can guarantee finishing next turn instead of the turn after. The solver only stops doing this when two or fewer candidates remain, at which point guessing one of them is free.',
+        },
+        {
+          q: 'TRACE buys more information than CRANE and gives a better average, yet CRANE never needs more than four guesses while TRACE sometimes needs five. What does that show?',
+          options: [
+            'The entropy calculation has an error in it',
+            'Optimising the average and optimising the worst case are different problems',
+            'CRANE is the better opening word by every measure',
+            'Five guesses means the solver failed',
+          ],
+          answer: 1,
+          why: 'Expected information gain is an average, and averages say nothing about tails. A greedy step that is best in expectation can leave a rare, awkward group behind, and a slightly worse step can avoid it. Which one you want depends on whether you mind an occasional bad game \u2014 and deciding that before you start optimising is most of the work.',
+        },
+      ],
+    },
     racer: {
       id: 'racer', badge: 'quiz-racer',
       title: 'Check yourself · evolution',

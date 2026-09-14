@@ -591,6 +591,71 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- Wordle: the solver, the probe, and the measured run ---- */
+  {
+    const page = await open('lessons/wordle.html');
+    await page.waitForTimeout(1200);
+    check('wordle · openers are ranked in the page',
+          (await page.locator('#opener-table tr').count()) > 5);
+    const top = (await page.locator('#opener-table tr.top td.w').innerText()).trim().toLowerCase();
+    check('wordle · the highest-information opener is found', top.length === 5, `(${top})`);
+    check('wordle · the board has six rows', (await page.locator('#board .grid5').count()) === 6);
+
+    // Measure two words against the full, untouched list first: a played word
+    // collapses to zero bits, which would otherwise make this comparison
+    // meaningless (and is itself asserted below).
+    const probe = page.locator('#probe-controls input');
+    const bitsOf = async (w) => {
+      await probe.fill(w);
+      await page.waitForTimeout(250);
+      return page.evaluate(() => parseFloat(document.getElementById('probe-readout').textContent));
+    };
+    const goodBits = await bitsOf(top);
+    const badBits = await bitsOf('vivid');
+    check('wordle · repeated letters measure as less informative', badBits < goodBits,
+          `(vivid ${badBits} < ${top} ${goodBits} bits)`);
+    await probe.fill('');
+    await page.click('#board');
+
+    // Typing a guess must play it and make the solver answer.
+    for (const ch of top) await page.keyboard.press(ch);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    const counts = await page.evaluate(() => ({
+      mine: window.__wordle.myGuesses.length,
+      solver: window.__wordle.solverGuesses.length,
+    }));
+    check('wordle · your guess makes the solver take its turn',
+          counts.mine === 1 && counts.solver === 1, JSON.stringify(counts));
+
+    const narrowed = await page.evaluate(() => {
+      const m = document.getElementById('solver-log').textContent.match(/→\s*([\d,]+)\s*still possible/);
+      return m ? +m[1].replace(/,/g, '') : -1;
+    });
+    check('wordle · one good guess cuts the list hard', narrowed > 0 && narrowed < 120,
+          `(${narrowed} left of 694)`);
+
+    // Replaying a word you have already played tells you nothing at all: every
+    // surviving candidate produces the colours you have already seen.
+    const replayBits = await bitsOf(top);
+    check('wordle · replaying a played word is worth zero bits', replayBits === 0,
+          `(${replayBits} bits)`);
+
+    // Enter in the probe box must hand the keyboard back to the game.
+    await probe.press('Enter');
+    const focused = await page.evaluate(() => document.activeElement.tagName.toLowerCase());
+    check('wordle · the probe releases the keyboard on Enter', focused !== 'input', `(focus: ${focused})`);
+
+    // And the whole-list measurement must finish and report.
+    await page.waitForFunction(
+      () => /Every one of the/.test(document.getElementById('results-note').textContent),
+      null, { timeout: 180000 });
+    const note = await page.textContent('#results-note');
+    check('wordle · the solver is measured over every answer', /Best average/.test(note),
+          '→ ' + note.replace(/\s+/g, ' ').slice(0, 60) + '…');
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();

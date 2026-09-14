@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guessing with information · Learn ML by Building</title>
+<meta name="description" content="The best way to play Wordle is not learned from data — it is measured in bits. Information theory, entropy and expected information gain, with a solver you can race.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  .grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 330px; }
+  .tile {
+    aspect-ratio: 1; display: grid; place-items: center; border-radius: 8px;
+    font-family: var(--mono); font-size: 1.35rem; font-weight: 700; text-transform: uppercase;
+    background: #0d1320; border: 2px solid var(--line); color: var(--text);
+  }
+  .tile.grey   { background: #2a3346; border-color: #2a3346; color: #93a3bd; }
+  .tile.yellow { background: #b59026; border-color: #b59026; color: #0b0f17; }
+  .tile.green  { background: #2f9e70; border-color: #2f9e70; color: #06110c; }
+  .tile.typing { border-color: var(--accent); }
+  .board-stack { display: flex; flex-direction: column; gap: 6px; }
+  /* The keyboard must be able to shrink: at 390px its minimum width was wider
+     than the column, which pushed the whole grid track past the viewport. */
+  .kbd { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; max-width: 420px; min-width: 0; }
+  .kbd button {
+    flex: 1 1 0; min-width: 22px; padding: 9px 4px; font-size: .8rem; font-family: var(--mono);
+    text-transform: uppercase; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--text-dim); border-radius: 6px; cursor: pointer;
+  }
+  .kbd button.grey { background: #1a2130; color: #5d6b83; }
+  .kbd button.yellow { background: #b59026; color: #0b0f17; border-color: #b59026; }
+  .kbd button.green { background: #2f9e70; color: #06110c; border-color: #2f9e70; }
+  .kbd button.wide { flex: 1.7 1 0; min-width: 38px; font-size: .72rem; }
+  .split-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 760px) { .split-cols { grid-template-columns: 1fr; } }
+  #buckets, #bits-chart { width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #0a0f19; }
+  table.rank { width: 100%; border-collapse: collapse; font-size: .86rem; }
+  table.rank th { text-align: left; color: var(--text-mute); font-weight: 500; font-size: .74rem;
+                  text-transform: uppercase; letter-spacing: .07em; padding: 6px 8px; }
+  table.rank td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); }
+  table.rank td.w { font-family: var(--mono); text-transform: uppercase; color: var(--text); }
+  table.rank td.n { font-family: var(--mono); color: var(--text-dim); text-align: right; }
+  table.rank tr.top td { color: var(--good); }
+  .eq { background: #0d1320; border: 1px solid var(--line); border-radius: 10px; padding: 15px 18px;
+        font-family: var(--mono); font-size: .95rem; color: #cfe0ff; overflow-x: auto; text-align: center; }
+  .eq .hl { color: var(--accent); }
+  .eq .hl2 { color: var(--good); }
+  .solver-line { font-family: var(--mono); font-size: .82rem; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Information theory · no neural network</div>
+    <h1>Guessing with information</h1>
+    <p class="lead">
+      Every other lesson here trains something. This one does not, because the best known way to
+      play Wordle is not learned from data at all — it is calculated. Before you type a word you can
+      work out exactly how much it will tell you, in bits, and then say the word that tells you the
+      most. It is worth seeing an idea this good that has no network in it anywhere.
+    </p>
+  </div>
+
+  <div id="lesson-goals"></div>
+
+  <div class="section">
+    <h2>Race the solver</h2>
+    <p>
+      You and the solver get the same hidden word. Type a guess and it plays its own turn
+      immediately, out of the same list, with no knowledge of the answer. Fewer guesses wins.
+    </p>
+
+    <div class="split">
+      <div class="panel game-panel" id="game-panel">
+        <div class="panel-title">
+          <h3><span class="game-tag">game</span> You</h3>
+          <span class="hint" id="turn-note">guess a five-letter word</span>
+        </div>
+        <div class="board-stack" id="board"></div>
+        <div class="kbd" id="keyboard"></div>
+        <div id="w-hud"></div>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-new" class="primary">New word</button>
+          <button id="btn-reveal">Give up</button>
+          <span id="w-sound"></span>
+        </div>
+        <div id="w-result" class="result-line"></div>
+        <div class="medal-track" id="w-medals"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>The solver</h3><span class="hint" id="solver-state"></span></div>
+        <div class="board-stack" id="solver-board"></div>
+        <div id="solver-log" style="margin-top:12px"></div>
+        <p class="muted" style="font-size:.82rem;margin:12px 0 0">
+          After each of its guesses the solver lists how many words are still possible. Watch that
+          number: a good guess does not just eliminate a few words, it cuts the list by something
+          like a factor of sixty.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>What a guess is actually worth</h2>
+    <p>
+      Type any word into the box below. The chart shows every colouring that word could come back
+      as, and how many of the remaining answers would produce each one. Those bars are the whole
+      idea: each bar is a group you would still have to tell apart afterwards.
+    </p>
+    <p>
+      A guess that produces one enormous bar has told you almost nothing — whatever happens, you are
+      left with nearly the same list. A guess that shatters the list into many small bars has done a
+      lot of work, because whichever bar you land in, there is not much left in it.
+    </p>
+
+    <div class="panel">
+      <div class="split-cols">
+        <div>
+          <div id="probe-controls"></div>
+          <canvas id="buckets" role="img" aria-label="How many possible answers produce each colouring of the probe word."></canvas>
+          <div id="probe-readout" style="margin-top:10px;font-size:.88rem"></div>
+        </div>
+        <div>
+          <div class="panel-title"><h3>Best guesses right now</h3><span class="hint">by expected information</span></div>
+          <table class="rank" id="rank-table"><tbody></tbody></table>
+          <p class="muted" style="font-size:.78rem;margin:10px 0 0">
+            Recomputed from whatever is still possible, so this list changes as the game does. A
+            word marked "can't win" is one the colours have already ruled out — worth saying anyway
+            when it splits the survivors better than any word that could win.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="eq" style="margin-top:18px">
+      bits(<span class="hl">guess</span>) &nbsp;=&nbsp; Σ<sub>colourings</sub> &nbsp;
+      <span class="hl2">p</span> · log<sub>2</sub>( 1 / <span class="hl2">p</span> )
+    </div>
+    <p style="margin-top:14px">
+      Read it right to left. If a colouring holds a fraction <b>p</b> of the candidates, then seeing
+      it shrinks your list by a factor of 1/p, and log₂ of that factor is the number of times you
+      have halved the problem — its <em>bits</em>. Multiply by how likely that colouring is, add up
+      over all of them, and you have what the guess is worth on average before you have said it.
+    </p>
+    <p>
+      With <span id="word-count">694</span> words in play you start with
+      <span id="total-bits">9.4</span> bits of uncertainty, because that is how many times you would
+      have to halve the list to get to one word. Every guess is an attempt to buy as many of those
+      bits as possible.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>So what should you open with?</h2>
+    <p>
+      Nothing is known at the start, so the best opening word is a fixed property of the word list —
+      the same every game. The table below is computed here, in your browser, by scoring every word
+      against every word: about half a million comparisons, which takes roughly a tenth of a second.
+    </p>
+    <div class="panel">
+      <div class="split-cols">
+        <div>
+          <div class="panel-title"><h3>Openers, ranked</h3><span class="hint" id="opener-time"></span></div>
+          <table class="rank" id="opener-table"><tbody></tbody></table>
+        </div>
+        <div>
+          <div class="panel-title"><h3>Bits per opening guess</h3></div>
+          <canvas id="bits-chart" role="img" aria-label="Distribution of expected information across all possible opening words."></canvas>
+          <p class="muted" style="font-size:.8rem;margin:10px 0 0">
+            Every word in the list, sorted by what it would tell you. The spread is the point:
+            the best opener is worth well over twice the worst one, and the worst ones are all
+            words with repeated letters, which waste a position asking a question they already
+            know the answer to.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Greedy is very good and not quite right</h2>
+    <p>
+      The solver above is greedy: at every turn it takes whatever buys the most bits right now,
+      without checking where that leaves it two turns later. I ran it against all
+      <span id="answer-count">694</span> possible answers, which is the only honest way to talk
+      about how well it plays.
+    </p>
+    <div class="panel">
+      <table class="cmp rank" id="results-table"><tbody></tbody></table>
+      <p class="muted" style="font-size:.84rem;margin:14px 0 0" id="results-note">Solving every word
+      in the list, a few at a time, so the page stays usable while it runs…</p>
+    </div>
+    <p style="margin-top:16px">
+      The interesting row is the second one. <b>TRACE</b> buys the most information of any opening
+      word and gives the best average. <b>CRANE</b> buys slightly less and gives a slightly worse
+      average — but it never needs more than four guesses, while TRACE occasionally needs five.
+    </p>
+    <p>
+      That is not a rounding error, it is the difference between two things you might want.
+      Maximising expected information optimises the <em>mean</em>. If what you actually care about
+      is never having a bad day, you want the <em>worst case</em>, and the word that wins on one
+      does not have to win on the other. Picking the metric before you optimise it is most of the
+      job, and this is the cheapest demonstration of it on the site.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><b>Open with a word full of repeats.</b> Try VIVID or FUNNY. Watch the bar chart collapse
+        into a few tall columns: a repeated letter spends one of your five questions asking
+        something you have already asked.</li>
+      <li><b>Play a word that cannot possibly be the answer.</b> Partway through a game, look down
+        the ranked list for a row marked "can't win" that still scores well. Saying it throws away
+        a chance to finish this turn and often saves a turn later.</li>
+      <li><b>Find a guess that scores zero bits.</b> Once only one candidate remains, every guess is
+        worth nothing, because the answer is already determined. Information is about what you do
+        not yet know, not about how clever the word is.</li>
+      <li><b>Watch the "still possible" count after the solver's first guess.</b> It goes from
+        several hundred to single figures surprisingly often. Six bits is a factor of sixty-four.</li>
+      <li><b>Beat the solver.</b> You can, and not only by luck: it never considers that the answer
+        is more likely to be a common word, because this list does not carry that information.
+        A person's sense of which words are plausible is real information the solver does not
+        have.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on the solver you just raced. You can't fail this — the explanation appears
+      either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/arcade.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
+<script src="../assets/js/lib/wordle-words.js"></script>
+<script src="../assets/js/lib/wordle.js"></script>
+<script src="../assets/js/lessons/wordle-lesson.js"></script>
+</body>
+</html>

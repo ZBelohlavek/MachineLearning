@@ -473,6 +473,110 @@ for (const cfg of [
   }
 }
 
+/* ----------------------------------------------------- wordle + information
+   No gradients here at all, which is the point of the lesson. What there is:
+   a scoring rule everyone gets wrong on duplicate letters, and an entropy
+   calculation that has to agree with what actually happens when you play the
+   guess. Both are checked exactly. */
+{
+  const { wordle: W } = require('../assets/js/lib/wordle.js');
+  const { WORDLE_WORDS: WORDS } = require('../assets/js/lib/wordle-words.js');
+  const cases = [];
+  const pat = (g, a) => W.patternDigits(W.score(g, a)).map((d) => '.yG'[d]).join('');
+
+  cases.push(['word list: every entry is five lowercase letters',
+    WORDS.every((w) => /^[a-z]{5}$/.test(w)) && new Set(WORDS).size === WORDS.length]);
+
+  // The duplicate-letter rule: greens claim their letters first, and only the
+  // answer's leftovers can make a later position yellow.
+  cases.push(['scoring: an exact match is all green', pat('crane', 'crane') === 'GGGGG']);
+  cases.push(['scoring: geese/these leaves the first e grey', pat('geese', 'these') === '..GGG']);
+  cases.push(['scoring: sassy/class spends both s letters correctly', pat('sassy', 'class') === 'yy.G.']);
+  cases.push(['scoring: array/radar', pat('array', 'radar') === 'yyyG.']);
+  cases.push(['scoring: abbey/babes', pat('abbey', 'babes') === 'yyGG.']);
+  cases.push(['scoring: a letter absent from the answer is grey', pat('vivid', 'crane') === '.....']);
+
+  // Scoring must be consistent with filtering: the answer always survives its
+  // own colours, and everything that survives really does produce them.
+  {
+    let ok = true;
+    for (let i = 0; i < 40; i++) {
+      const answer = WORDS[(i * 37) % WORDS.length];
+      const guess = WORDS[(i * 101 + 5) % WORDS.length];
+      const code = W.score(guess, answer);
+      const kept = W.filter(WORDS, guess, code);
+      if (!kept.includes(answer)) ok = false;
+      for (const k of kept) if (W.score(guess, k) !== code) ok = false;
+    }
+    cases.push(['filtering: the answer always survives, and survivors all match', ok]);
+  }
+
+  // Entropy has to mean what the lesson says it means.
+  {
+    const single = ['crane'];
+    cases.push(['entropy: with one candidate left, every guess is worth 0 bits',
+      Math.abs(W.entropy('slate', single)) < 1e-12]);
+
+    // A guess that splits n candidates into n equally sized buckets is worth
+    // exactly log2(n) bits; the opener cannot beat the total uncertainty.
+    const bits = W.entropy('trace', WORDS);
+    cases.push([`entropy: an opener cannot exceed log2(list) (${bits.toFixed(2)} < ${Math.log2(WORDS.length).toFixed(2)})`,
+      bits > 0 && bits < Math.log2(WORDS.length)]);
+
+    // N / 2^H is not the expected number of survivors — it is their weighted
+    // GEOMETRIC mean, which is always the smaller of the two. Worth pinning
+    // down, because quoting one and calling it the other overstates how much a
+    // guess achieves.
+    const counts = new Int32Array(W.PATTERNS);
+    for (const w of WORDS) counts[W.score('trace', w)]++;
+    let arithmetic = 0, logGeo = 0;
+    for (let c = 0; c < W.PATTERNS; c++) {
+      if (!counts[c]) continue;
+      const p = counts[c] / WORDS.length;
+      arithmetic += p * counts[c];
+      logGeo += p * Math.log(counts[c]);
+    }
+    const geometric = Math.exp(logGeo);
+    const fromBits = WORDS.length / Math.pow(2, bits);
+    cases.push([`entropy: N/2^bits is exactly the geometric mean (${geometric.toFixed(2)} vs ${fromBits.toFixed(2)})`,
+      Math.abs(geometric - fromBits) < 1e-6]);
+    cases.push([`entropy: the true expected remainder is larger (${arithmetic.toFixed(1)} > ${geometric.toFixed(1)})`,
+      arithmetic > geometric]);
+
+    // A word of five identical letters can barely split anything.
+    const flat = W.entropy('vivid', WORDS);
+    cases.push([`entropy: repeated letters score worse (${flat.toFixed(2)} < ${bits.toFixed(2)})`, flat < bits]);
+  }
+
+  // The solver must actually solve, from any answer, without ever exceeding six.
+  {
+    let worst = 0, total = 0, failed = 0;
+    for (let i = 0; i < WORDS.length; i += 7) {
+      const g = W.solve(WORDS[i], WORDS, 'trace');
+      const last = g[g.length - 1];
+      if (!last || last.code !== W.ALL_GREEN) failed++;
+      worst = Math.max(worst, g.length);
+      total += g.length;
+    }
+    const n = Math.ceil(WORDS.length / 7);
+    cases.push([`solver: always finds the word (mean ${(total / n).toFixed(2)}, worst ${worst})`,
+      failed === 0 && worst <= 6]);
+  }
+
+  // Ranking must prefer information, and must be able to name a word that
+  // cannot win when that word splits the survivors better.
+  {
+    const ranked = W.rankGuesses(WORDS, WORDS, 5);
+    const descending = ranked.every((r, i) => i === 0 || r.bits <= ranked[i - 1].bits);
+    cases.push(['ranking: guesses come back in descending order of information', descending]);
+  }
+
+  for (const [name, ok] of cases) {
+    if (!ok) failures++;
+    console.log(`${ok ? '  ok  ' : ' FAIL '} ${('wordle  ' + name).padEnd(72)}`);
+  }
+}
+
 console.log(failures === 0
   ? '\nAll checks passed.'
   : `\n${failures} check(s) failed.`);
