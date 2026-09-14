@@ -282,6 +282,197 @@ for (const cfg of [
   }
 }
 
+/* -------------------------------------------------- connect 4 + tree search
+   The rules and the search are pure logic, so they can be checked exactly
+   rather than statistically. A search that cannot see a win one move away is
+   broken no matter what the win rate says. */
+{
+  const { C4 } = require('../assets/js/lessons/connect4-env.js');
+  const { MCTS, pickMove } = require('../assets/js/lib/mcts.js');
+  const cases = [];
+
+  // --- rules ---
+  {
+    const b = C4.newBoard();
+    let y = 0;
+    for (let i = 0; i < 4; i++) y = C4.play(b, 3, C4.P1);
+    cases.push(['rules: four in a column wins', C4.winsAt(b, 3, y)]);
+  }
+  {
+    const b = C4.newBoard();
+    let y = 0;
+    for (let x = 0; x < 4; x++) y = C4.play(b, x, C4.P2);
+    cases.push(['rules: four in a row wins', C4.winsAt(b, 3, y)]);
+    const line = C4.winningLine(b, 3, y);
+    cases.push(['rules: the winning line is four cells', !!line && line.length === 4]);
+  }
+  {
+    const b = C4.newBoard();
+    for (let i = 0; i < 6; i++) C4.play(b, 0, C4.P1);
+    cases.push(['rules: a full column is not a legal move', !C4.legalMoves(b).includes(0)]);
+    cases.push(['rules: dropping into a full column is refused', C4.play(b, 0, C4.P2) === -1]);
+  }
+  {
+    // A board is encoded from the mover's side, so the same position seen by
+    // each player must produce mirrored planes. That is what lets one network
+    // play both colours.
+    const b = C4.newBoard();
+    C4.play(b, 2, C4.P1); C4.play(b, 4, C4.P2);
+    const a = C4.encode(b, C4.P1), c = C4.encode(b, C4.P2);
+    let mirrored = true;
+    for (let i = 0; i < C4.N; i++) {
+      if (a[i] !== c[C4.N + i] || a[C4.N + i] !== c[i]) mirrored = false;
+    }
+    cases.push(['encoding: the two players see mirrored planes', mirrored]);
+  }
+  {
+    // Making and unmaking a move must leave the board byte-for-byte identical,
+    // or the search corrupts the position it is searching.
+    const b = C4.newBoard();
+    C4.play(b, 1, C4.P1); C4.play(b, 5, C4.P2);
+    const before = Array.from(b).join('');
+    const row = C4.play(b, 3, C4.P1);
+    C4.undo(b, 3, row);
+    cases.push(['search: make and unmake restores the board', Array.from(b).join('') === before]);
+  }
+
+  // --- the search itself, with a network that knows nothing ---
+  const game = {
+    nActions: C4.W,
+    legal: (b) => C4.legalMoves(b),
+    apply: (b, a, p) => C4.play(b, a, p),
+    undo: (b, a, row) => C4.undo(b, a, row),
+    justWon: (b, a, row) => C4.winsAt(b, a, row),
+    isDraw: (b) => C4.isFull(b),
+    other: (p) => (p === C4.P1 ? C4.P2 : C4.P1),
+  };
+  const blind = () => ({ P: Float32Array.from({ length: C4.W }, () => 1 / C4.W), v: 0 });
+  const mcts = new MCTS(game, blind, { rand: Math.random });
+
+  {
+    const b = C4.newBoard();
+    C4.play(b, 0, C4.P1); C4.play(b, 1, C4.P1); C4.play(b, 2, C4.P1);
+    C4.play(b, 0, C4.P2); C4.play(b, 1, C4.P2);
+    const r = mcts.search(b, C4.P1, 400);
+    cases.push(['search: takes a win one move away', pickMove(r.visits, 0) === 3]);
+  }
+  {
+    const b = C4.newBoard();
+    C4.play(b, 0, C4.P2); C4.play(b, 1, C4.P2); C4.play(b, 2, C4.P2);
+    C4.play(b, 5, C4.P1); C4.play(b, 6, C4.P1);
+    const r = mcts.search(b, C4.P1, 800);
+    cases.push(['search: blocks a loss one move away', pickMove(r.visits, 0) === 3]);
+  }
+  {
+    const b = C4.newBoard();
+    const r = mcts.search(b, C4.P1, 200);
+    let total = 0;
+    for (const v of r.visits) total += v;
+    cases.push(['search: every simulation is accounted for', Math.abs(total - 200) < 1e-6]);
+    let sum = 0;
+    for (const p of r.policy) sum += p;
+    cases.push(['search: the visit policy sums to one', Math.abs(sum - 1) < 1e-5]);
+  }
+  {
+    // A full column must never be searched, whatever the priors say.
+    const b = C4.newBoard();
+    for (let i = 0; i < 6; i++) C4.play(b, 3, i % 2 ? C4.P1 : C4.P2);
+    const r = mcts.search(b, C4.P1, 120);
+    cases.push(['search: never spends a visit on an illegal move', r.visits[3] === 0]);
+  }
+  {
+    // Temperature 0 is deterministic; temperature 1 must be able to pick others.
+    const v = Float32Array.from([1, 60, 30, 5, 0, 0, 0]);
+    const greedy = new Set();
+    for (let i = 0; i < 30; i++) greedy.add(pickMove(v, 0));
+    const sampled = new Set();
+    for (let i = 0; i < 200; i++) sampled.add(pickMove(v, 1));
+    cases.push(['search: temperature 0 always picks the most visited',
+      greedy.size === 1 && greedy.has(1)]);
+    cases.push(['search: temperature 1 explores other moves', sampled.size > 1]);
+  }
+
+  // --- the combined policy/value gradient, against finite differences ---
+  {
+    const { C4Trainer } = require('../assets/js/lessons/connect4-train.js');
+    const t = new C4Trainer({ seed: 2, hp: { batch: 8 } });
+    for (let i = 0; i < 3; i++) t.selfPlayGame();
+
+    const sample = t.buffer.slice(0, 8);
+    const loss = () => {
+      let L = 0;
+      for (const s of sample) {
+        const out = t.net.forward(s.x);
+        const logits = new Float32Array(C4.W);
+        for (let a = 0; a < C4.W; a++) logits[a] = out[a];
+        let max = -Infinity;
+        for (const l of logits) max = Math.max(max, l);
+        let z = 0;
+        for (const l of logits) z += Math.exp(l - max);
+        for (let a = 0; a < C4.W; a++) {
+          if (s.pi[a] > 0) L -= s.pi[a] * (logits[a] - max - Math.log(z));
+        }
+        const v = Math.tanh(out[C4.W]);
+        L += (v - s.z) * (v - s.z);
+      }
+      return L / sample.length;
+    };
+
+    // analytic gradient for exactly this batch
+    t.net.zeroGrad();
+    const d = new Float32Array(C4.W + 1);
+    for (const s of sample) {
+      const out = t.net.forward(s.x);
+      const logits = new Float32Array(C4.W);
+      for (let a = 0; a < C4.W; a++) logits[a] = out[a];
+      let max = -Infinity;
+      for (const l of logits) max = Math.max(max, l);
+      let z = 0;
+      for (const l of logits) z += Math.exp(l - max);
+      for (let a = 0; a < C4.W; a++) {
+        d[a] = (Math.exp(logits[a] - max) / z - s.pi[a]) / sample.length;
+      }
+      const v = Math.tanh(out[C4.W]);
+      d[C4.W] = (2 * (v - s.z) * (1 - v * v)) / sample.length;
+      t.net.backward(d);
+    }
+
+    // Directional derivative, the same criterion the other backward passes use.
+    // eps matters here: the hidden layers are ReLU, so a larger step crosses
+    // kinks and the "error" it reports is the kink, not the gradient. Checked
+    // by sweeping eps — the discrepancy falls 1.2e-2 → 5.7e-5 from 1e-2 to
+    // 1e-4, which is convergence rather than a bug.
+    const check = (layer, eps, seedFn) => {
+      const dir = new Float64Array(layer.W.length);
+      let dot = 0;
+      for (let i = 0; i < dir.length; i++) { dir[i] = seedFn(i); dot += dir[i] * layer.dW[i]; }
+      const orig = Float32Array.from(layer.W);
+      for (let i = 0; i < dir.length; i++) layer.W[i] = orig[i] + eps * dir[i];
+      const lPlus = loss();
+      for (let i = 0; i < dir.length; i++) layer.W[i] = orig[i] - eps * dir[i];
+      const lMinus = loss();
+      layer.W.set(orig);
+      const numeric = (lPlus - lMinus) / (2 * eps);
+      return Math.abs(numeric - dot) / Math.max(1e-9, Math.abs(numeric) + Math.abs(dot));
+    };
+
+    // The output layer carries both heads and has no ReLU above it, so this is
+    // the clean test of the policy and value gradient maths itself.
+    const outErr = check(t.net.layers[t.net.layers.length - 1], 1e-3, (i) => Math.cos(i * 7.13) % 1);
+    cases.push([`training: policy+value head gradient exact (rel err ${outErr.toExponential(1)})`,
+      outErr < 1e-4]);
+
+    const deepErr = check(t.net.layers[0], 1e-4, (i) => Math.sin(i * 12.9898) * 43758.5453 % 1);
+    cases.push([`training: gradient reaches the first layer (rel err ${deepErr.toExponential(1)})`,
+      deepErr < 1e-3]);
+  }
+
+  for (const [name, ok] of cases) {
+    if (!ok) failures++;
+    console.log(`${ok ? '  ok  ' : ' FAIL '} ${('connect4  ' + name).padEnd(72)}`);
+  }
+}
+
 console.log(failures === 0
   ? '\nAll checks passed.'
   : `\n${failures} check(s) failed.`);

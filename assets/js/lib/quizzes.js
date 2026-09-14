@@ -254,6 +254,45 @@
       ],
     },
 
+    connect4: {
+      id: 'connect4', badge: 'quiz-connect4',
+      title: 'Check yourself \u00b7 search and self-play',
+      questions: [
+        {
+          q: 'You drag thinking time down to 1 simulation. The same trained network now loses to a bot whose whole strategy is "take a win, block a loss". What does that tell you?',
+          options: [
+            'The network was never trained properly',
+            'The network holds strategy, and the search supplies the tactics',
+            'One simulation is a bug \u2014 it should still search',
+            'The scripted bot is stronger than it looks',
+          ],
+          answer: 1,
+          why: 'At 1 simulation you are playing the raw network, and it plays the opening well while walking into fours it could have seen. Measured on the agent that ships with the page, forty games against that bot each time: 23 wins with no search, 39 with a hundred simulations, identical weights. Asked to find a move that wins immediately, the raw network picks it about a quarter of the time. The network learned what good positions look like across thousands of games; it never learned to check three moves ahead, because it was never asked to. That division of labour is the entire point of the method.',
+        },
+        {
+          q: 'During self-play the agent wins almost exactly half its games, from the first minute to the last. Why is that number useless?',
+          options: [
+            'It is a bug in how the games are scored',
+            'It is both players, so wins and losses always cancel',
+            'Connect 4 is a drawn game with perfect play',
+            'The agent is not learning',
+          ],
+          answer: 1,
+          why: 'One network plays both colours, so every win it records is also a loss it records. The score is pinned near half regardless of strength, exactly as in the Rocket League lesson where self-play goals for and against track each other. The only measurement that can move is against something that does not improve alongside you \u2014 here, the fixed scripted bot behind the "Test it" button.',
+        },
+        {
+          q: 'In the PUCT formula the search adds c \u00b7 P(a) \u00b7 \u221aN / (1 + N(a)) to each move\u2019s recorded score. What does the (1 + N(a)) on the bottom accomplish?',
+          options: [
+            'It keeps the numbers small enough to avoid overflow',
+            'It makes the search abandon the network\u2019s guess once a move has real results',
+            'It stops the same move being played twice in a game',
+            'It scales the value head into the right range',
+          ],
+          answer: 1,
+          why: 'A move that has never been tried has N(a) = 0, so the whole term is just the network\u2019s prior and the search goes wherever the network points. Every visit grows the denominator, shrinking the prior\u2019s influence until the recorded results dominate. It is a dial that slides from "trust the model" to "trust the evidence", and it slides on its own as evidence arrives.',
+        },
+      ],
+    },
     racer: {
       id: 'racer', badge: 'quiz-racer',
       title: 'Check yourself · evolution',

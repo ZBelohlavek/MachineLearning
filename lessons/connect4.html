@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teach a model to search · Learn ML by Building</title>
+<meta name="description" content="AlphaZero in a browser tab: a Connect 4 agent that plans ahead with Monte Carlo tree search and teaches itself by playing itself. Play it, watch it think, and train your own.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  .board-wrap { position: relative; }
+  #board { width: 100%; background: #0d1320; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; touch-action: manipulation; }
+  #think { width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #0a0f19; }
+  .disc-key { display: flex; gap: 16px; flex-wrap: wrap; font-size: .84rem; color: var(--text-dim); margin-top: 10px; }
+  .disc-key i { width: 13px; height: 13px; border-radius: 50%; display: inline-block; vertical-align: -2px; margin-right: 6px; }
+  .ladder { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-top: 4px; }
+  .rung {
+    text-align: left; padding: 9px 11px; border-radius: var(--radius-sm);
+    background: var(--panel-2); border: 1px solid var(--line); cursor: pointer; color: var(--text-dim);
+  }
+  .rung:hover { border-color: var(--accent); }
+  .rung.on { border-color: var(--accent); background: rgba(77,163,255,.14); color: var(--text); }
+  .rung b { display: block; font-size: .9rem; color: var(--text); }
+  .rung span { font-size: .72rem; color: var(--text-mute); font-family: var(--mono); }
+  .rung.on span { color: var(--accent); }
+  .eq { background: #0d1320; border: 1px solid var(--line); border-radius: 10px; padding: 15px 18px;
+        font-family: var(--mono); font-size: .95rem; color: #cfe0ff; overflow-x: auto; text-align: center; }
+  .eq .hl { color: var(--accent); }
+  .eq .hl2 { color: var(--good); }
+  .loop-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 16px 0; }
+  .loop-steps .panel b { display: block; color: var(--text); margin-bottom: 4px; }
+  .cmp { width: 100%; border-collapse: collapse; font-size: .88rem; margin-top: 6px; }
+  .cmp th, .cmp td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line-soft); }
+  .cmp th { color: var(--text-mute); font-weight: 500; font-size: .76rem; text-transform: uppercase; letter-spacing: .07em; }
+  .cmp td.num { font-family: var(--mono); color: var(--text); }
+  .cmp tr.best td { color: var(--good); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Search + self-play · AlphaZero</div>
+    <h1>Teach a model to search</h1>
+    <p class="lead">
+      Every other agent on this site reacts. It reads the situation, picks a move and lives with it.
+      This one stops and thinks: before each move it plays out hundreds of imagined continuations,
+      and the network's job is not to pick the move but to guess what all that thinking will
+      conclude. It learns the game by playing itself, and nobody ever tells it a single rule of
+      strategy.
+    </p>
+  </div>
+
+  <div id="lesson-goals"></div>
+
+  <div class="section">
+    <h2>Play it first</h2>
+    <p>
+      Drop a disc by clicking a column. You are yellow and you go first. The ladder beside the board
+      swaps in a different checkpoint from one self-play run — the same code and the same shape of network
+      each time, only more experience. The rungs are ordered by how each one actually did against a fixed
+      opponent, and the weakest is not the least-trained one, which is a story in itself further down.
+    </p>
+
+    <div class="split">
+      <div class="panel game-panel" id="game-panel">
+        <div class="panel-title">
+          <h3><span class="game-tag">game</span> Beat the bot</h3>
+          <span class="hint" id="turn-note">your move</span>
+        </div>
+        <div class="board-wrap stage" id="board-stage">
+          <canvas id="board" role="img" aria-label="A Connect 4 board. Click a column to drop a disc."></canvas>
+        </div>
+        <div class="disc-key">
+          <span><i style="background:#ffd166"></i>you</span>
+          <span><i style="background:#4da3ff"></i>the agent</span>
+          <span id="last-think"></span>
+        </div>
+        <div id="c4-hud"></div>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-new" class="primary">New game</button>
+          <button id="btn-undo">Take back</button>
+          <button id="btn-hint">What would it play?</button>
+          <span id="c4-sound"></span>
+        </div>
+        <div id="c4-result" class="result-line"></div>
+        <div class="medal-track" id="c4-medals"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>Opponent</h3><span class="hint">a checkpoint from one run</span></div>
+        <div class="ladder" id="ladder"></div>
+        <div style="margin-top:16px" id="sims-control"></div>
+        <p class="muted" style="font-size:.82rem;margin:10px 0 0">
+          Thinking time is how many games it plays out in its head before each move, and it is the single
+          biggest lever on how hard this is. Measured on the finished agent, forty games against the same
+          scripted bot: <b>23 wins with the search off</b>, 36 at twenty-five simulations, <b>39 at a
+          hundred</b>. Same weights in all three.
+        </p>
+        <div class="panel-title" style="margin-top:18px"><h3>What it is considering</h3></div>
+        <canvas id="think" role="img" aria-label="Bar chart of how many simulations the search spent on each column."></canvas>
+        <p class="muted" style="font-size:.8rem;margin:10px 0 0">
+          One bar per column, showing how much of its thinking budget went there. The search spends
+          its time where the results are good, so the tallest bar is the move it will play — and the
+          second tallest is the move it took seriously and rejected.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Why this cannot be done the usual way</h2>
+    <p>
+      In the Rocket League lesson the agent learns a reflex: a number arrives thirty times a second
+      and it adjusts. Connect 4 gives you nothing like that. One number arrives at the very end of
+      the game, win or lose, and by then forty moves have gone by and you have no idea which of them
+      mattered. Worse, a position that looks fine is often lost already, several moves before
+      anything visibly goes wrong.
+    </p>
+    <p>
+      So instead of guessing harder, you look. The agent runs a search over what might happen next,
+      guided by the network but not limited to it, and that search sees the trap the network missed.
+      Then the network is trained on what the search concluded, which makes the next search better.
+    </p>
+    <div class="eq">
+      <span class="hl">network</span> guides <span class="hl2">search</span>
+      &nbsp;→&nbsp; <span class="hl2">search</span> plays better than <span class="hl">network</span>
+      &nbsp;→&nbsp; train <span class="hl">network</span> on <span class="hl2">search</span>
+      &nbsp;→&nbsp; repeat
+    </div>
+    <p style="margin-top:14px">
+      That loop is the whole of AlphaZero, and it is the reason a program can get superhuman at a
+      game nobody taught it. The network is a fast approximation of a slow, careful process, and
+      each round of training makes the approximation good enough to make the careful process
+      cheaper.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Watch it think</h2>
+    <p>
+      Press the button and the search runs one simulation at a time so you can see the tree being
+      built. Each simulation walks down from the current position choosing promising moves, stops
+      somewhere it has not been, asks the network what it thinks, and carries that verdict back up
+      the path it came down. Nothing is random about which branches get explored — it is the formula
+      below, and the two halves of it pull in opposite directions.
+    </p>
+    <div class="panel">
+      <div class="panel-title"><h3>One simulation at a time</h3><span class="hint" id="sim-count"></span></div>
+      <canvas id="tree" role="img" aria-label="The search tree being built, one simulation at a time."></canvas>
+      <div class="controls" style="margin-top:12px">
+        <button id="btn-sim1">One simulation</button>
+        <button id="btn-sim25">Twenty-five</button>
+        <button id="btn-simreset" class="small">Clear the tree</button>
+      </div>
+      <div class="eq" style="margin-top:14px">
+        pick the move with the largest &nbsp;
+        <span class="hl2">Q(a)</span> &nbsp;+&nbsp;
+        c · <span class="hl">P(a)</span> · √N ⁄ (1 + N(a))
+      </div>
+      <p class="muted" style="font-size:.84rem;margin:12px 0 0">
+        <span style="color:var(--good)">Q(a)</span> is how well this move has actually turned out so
+        far. <span style="color:var(--accent)">P(a)</span> is what the network guessed before any of
+        it was tried. Early on the second term dominates and the search follows the network's hunch;
+        as visits pile up the denominator grows and results take over. That is the whole balance
+        between trusting a model and checking it.
+      </p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Train your own</h2>
+    <p>
+      This starts from random weights on your machine. It plays itself, labels every position with
+      what the search decided there and who eventually won, and trains on that. There is no dataset
+      and no opponent: the only teacher is a slightly better version of the same agent.
+    </p>
+    <div class="loop-steps">
+      <div class="panel">
+        <b>1 · Play</b>
+        <p class="mb0" style="font-size:.88rem">The current network plays a full game against itself,
+        running a tree search at every move and sampling its choice from the visit counts so no two
+        games are the same.</p>
+      </div>
+      <div class="panel">
+        <b>2 · Label</b>
+        <p class="mb0" style="font-size:.88rem">Each position is stored with the search's move
+        distribution, and once the game ends, with the result from that player's point of view.</p>
+      </div>
+      <div class="panel">
+        <b>3 · Learn</b>
+        <p class="mb0" style="font-size:.88rem">Two heads, two losses: match the search's preferences,
+        and predict the winner. Then the improved network goes back to step 1.</p>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>Progress</h3></div>
+        <div id="c4-stats"></div>
+        <div class="controls" style="margin-top:14px">
+          <button id="btn-train" class="primary">▶ Start self-play</button>
+          <button id="btn-eval">Test it</button>
+          <button id="btn-reset-train" class="danger">Start over</button>
+        </div>
+        <div id="run-bar"></div>
+        <canvas id="c4-chart" class="fit" style="margin-top:14px" role="img" aria-label="Chart of policy and value loss against self-play games."></canvas>
+        <p class="muted" style="font-size:.8rem;margin:12px 0 0">
+          Policy loss starts at ln 7 = 1.95, which is what a network with no opinion costs. Value
+          loss often climbs partway through, and that is not a fault: as the agent gets better its
+          games get closer, and predicting the winner of a close game is genuinely harder.
+        </p>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Hyperparameters</h3></div>
+        <div id="c4-hp"></div>
+        <div class="note warn" style="margin-top:14px">
+          <b class="label">Self-play scores are meaningless</b>
+          <p class="mb0">The agent is both players, so it wins exactly half its games no matter how
+          good or bad it is. "Test it" plays the fixed scripted opponent instead — one that always
+          takes a win and always blocks a loss — which is the only number here that can go up.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Getting better is not a straight line</h2>
+    <p>
+      Here is every checkpoint from the run that ships with this page, each one played forty times
+      against the same scripted bot. I expected a curve that climbs. What it actually does is fall off a
+      cliff first.
+    </p>
+    <div class="panel">
+      <canvas id="strength-chart" class="fit" role="img" aria-label="Measured win rate of each saved checkpoint against the scripted bot."></canvas>
+      <p class="muted" style="font-size:.84rem;margin:12px 0 0" id="strength-note"></p>
+    </div>
+    <p style="margin-top:16px">
+      The untrained network wins 30 of 40, because a tree search with no knowledge at all still notices
+      a win one move away. Two hundred and seventy-eight games later it wins <b>1</b>. It takes until
+      around two thousand five hundred games just to get back to where it started, and six thousand to
+      finish clearly ahead at 35.
+    </p>
+    <p>
+      The reason is worth sitting with, because it is the opposite of the usual intuition. A network
+      with no opinion lets the search look everywhere. A network with a <em>confident wrong</em> opinion
+      points the search at one column and it stops checking the others. Half-learned is worse than
+      ignorant here, and the only cure is more training. So "trained longer" is not a difficulty setting,
+      which is why the rungs under the board are ordered by measured results and their games-played
+      numbers do not climb in step.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>How much of it is the network?</h2>
+    <p>
+      Worth being precise about. I took the finished agent — the strongest rung, six thousand games —
+      and played it against the scripted bot forty times at four different search budgets, changing
+      nothing else:
+    </p>
+    <div class="panel">
+      <table class="cmp" id="ladder-table"><tbody></tbody></table>
+      <p class="muted" style="font-size:.84rem;margin:14px 0 0" id="ladder-note"></p>
+    </div>
+    <p style="margin-top:16px">
+      With the search switched off the network is not hopeless: 23 of 40 is a winning record against a
+      bot that always takes a win and always blocks one. But turn the search on and the same weights take
+      39 of 40. Everything between those two numbers is search, not learning.
+    </p>
+    <p>
+      You can see what each half contributes. Ask the shipped network about an empty board and it puts
+      <b>91% of its probability on the centre column</b>, which is correct and is a genuinely useful thing
+      to know about Connect 4 — it worked that out from six thousand games with nobody mentioning it. Then
+      set up positions where one move wins immediately: the raw network picks the winning move in about a
+      <b>quarter</b> of them. It has absorbed where good positions come from. It has not absorbed how to
+      count to four, and it never will, because looking is cheaper than remembering.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><b>Drag thinking time down to 1.</b> The search is gone and you are playing the raw
+        network. It plays the centre, it has opinions about shape, and it will walk straight into a
+        four you set up in plain sight.</li>
+      <li>
+        <b>Play the weakest rung at high thinking time.</b> Its network is actively misleading — it is the
+        checkpoint from the collapse — and yet it is still awkward to beat, because the search keeps
+        rescuing it from its own advice.
+      </li>
+      <li><b>Set up a three-in-a-row and watch the bars.</b> The column that blocks you takes almost
+        the entire budget. That is the search discovering a threat the network did not flag.</li>
+      <li><b>Train from scratch and test every thirty seconds.</b> The first improvement is
+        positional — it stops throwing discs at the edges — and the tactics arrive much later.</li>
+      <li><b>Turn the Dirichlet noise off and train.</b> Self-play games become near-identical, the
+        buffer fills with one opening, and progress stalls. It is the only exploration this
+        algorithm has.</li>
+      <li><b>Compare with the Rocket League agent.</b> Same idea of learning from your own play,
+        completely different machinery: one reacts in milliseconds, this one deliberates. Which you
+        can afford depends entirely on whether the clock is running.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions about the agent you just played. You can't fail this — the explanation appears
+      either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/arcade.js"></script>
+<script src="../assets/js/lib/mcts.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
+<script src="../assets/models/connect4-stages.js"></script>
+<script src="../assets/js/lessons/connect4-env.js"></script>
+<script src="../assets/js/lessons/connect4-train.js"></script>
+<script src="../assets/js/lessons/connect4.js"></script>
+</body>
+</html>

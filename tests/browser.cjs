@@ -352,8 +352,15 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
       curves: document.querySelectorAll('#curve-game .quiz-q').length,
       canvases: document.querySelectorAll('.curve-canvas').length,
     }));
-    check('capstone · nine situations and four drawn training curves',
-          shape.approach === 9 && shape.curves === 4 && shape.canvases === 4,
+    // The counts come from the question arrays, so assert they agree with the
+    // page rather than pinning a number the lesson is free to grow.
+    const declared = await page.evaluate(() => ({
+      approach: +document.querySelector('#approach-score').textContent.split('/')[1].trim(),
+      curves: +document.querySelector('#curve-score').textContent.split('/')[1].trim(),
+    }));
+    check('capstone · every situation and curve is rendered',
+          shape.approach === declared.approach && shape.curves === declared.curves &&
+          shape.canvases === shape.curves && shape.approach >= 9,
           JSON.stringify(shape));
     // discover the right answers by picking one, then reset and answer properly
     await page.evaluate(() => {
@@ -377,12 +384,14 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
                  .filter((b) => b.startsWith('capstone')).length };
     });
     check('capstone · answering everything correctly earns both badges',
-          final.a === '9 / 9' && final.c === '4 / 4' && final.badges === 2,
+          final.a === `${declared.approach} / ${declared.approach}` &&
+          final.c === `${declared.curves} / ${declared.curves}` && final.badges === 2,
           `(${final.a}, ${final.c})`);
     await page.reload();
     await page.waitForTimeout(1200);
     const kept = await page.evaluate(() => document.querySelector('#approach-score').textContent);
-    check('capstone · answers persist across a reload', kept === '9 / 9');
+    check('capstone · answers persist across a reload',
+          kept === `${declared.approach} / ${declared.approach}`);
     await page.close();
   }
 
@@ -516,6 +525,69 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
       document.querySelectorAll('#shootout-hud .hud-value')[1].textContent);
     check('shootout · a goal for the player is counted', scored === '1');
     check('shootout · and is announced', /Goal/.test(await page.textContent('#shootout-result')));
+    await page.close();
+  }
+
+  /* ---- Connect 4: search, play, ladder, training ---- */
+  {
+    const page = await open('lessons/connect4.html');
+    check('connect4 · the board renders',
+          await page.evaluate(() => {
+            const c = document.getElementById('board');
+            return c.width > 100 && c.height > 100;
+          }));
+    const rungs = await page.locator('#ladder .rung').count();
+    check('connect4 · the difficulty ladder is built', rungs >= 2, `(${rungs} rungs)`);
+
+    // The ladder must get harder as you climb it, whichever checkpoint is best.
+    const monotonic = await page.evaluate(() =>
+      window.__c4.rungs.every((r, i, arr) =>
+        i === 0 || !r.eval || !arr[i - 1].eval ||
+        (r.eval.wins + r.eval.draws * 0.5) >= (arr[i - 1].eval.wins + arr[i - 1].eval.draws * 0.5)));
+    check('connect4 · the ladder is ordered by measured strength', monotonic);
+
+    // Playing a move must produce a reply, and the search must show its work.
+    await page.evaluate(() => window.__c4.drop(3));
+    await page.waitForFunction(() => {
+      const b = window.__c4.board;
+      let n = 0;
+      for (const v of b) if (v) n++;
+      return n >= 2;
+    }, null, { timeout: 20000 });
+    const discs = await page.evaluate(() => {
+      let mine = 0, theirs = 0;
+      for (const v of window.__c4.board) { if (v === 1) mine++; else if (v === 2) theirs++; }
+      return { mine, theirs };
+    });
+    check('connect4 · the agent answers your move', discs.mine === 1 && discs.theirs === 1,
+          `(you ${discs.mine}, it ${discs.theirs})`);
+    check('connect4 · it reports how long it thought',
+          /simulations in/.test(await page.textContent('#last-think')));
+
+    // Stepping the search one simulation at a time.
+    await page.click('#btn-sim25');
+    check('connect4 · the search can be stepped by hand',
+          /25 simulations/.test(await page.textContent('#sim-count')));
+
+    // A search with a real budget must block an obvious threat.
+    const blocked = await page.evaluate(async () => {
+      const { C4 } = window.ML;
+      const b = C4.newBoard();
+      C4.play(b, 0, C4.P2); C4.play(b, 1, C4.P2); C4.play(b, 2, C4.P2);
+      C4.play(b, 5, C4.P1); C4.play(b, 6, C4.P1);
+      const r = window.__c4.search.search(b, C4.P1, 600);
+      let best = 0;
+      for (let a = 1; a < 7; a++) if (r.visits[a] > r.visits[best]) best = a;
+      return best;
+    });
+    check('connect4 · the search blocks a three-in-a-row', blocked === 3, `(played column ${blocked + 1})`);
+
+    // Self-play training must actually run in the page.
+    await page.click('#btn-train');
+    await page.waitForTimeout(6000);
+    await page.click('#btn-train');
+    const games = await page.evaluate(() => window.__c4.trainer.games);
+    check('connect4 · self-play trains in the browser', games > 3, `(${games} games)`);
     await page.close();
   }
 

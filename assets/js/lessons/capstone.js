@@ -68,6 +68,17 @@
       why: 'The agent is optimising exactly what you wrote. Reward hacking is a specification problem rather than a training one, which is why the Rocket League lesson hands you the weights and invites you to break it on purpose.',
     },
     {
+      q: 'A board game gives one reward at the very end, moves matter forty plies before anything visibly goes wrong, and you have unlimited time per move.',
+      options: [
+        'Policy gradients on the raw reward, as in the Rocket League lesson',
+        'A search over what happens next, with a network trained on what the search concluded',
+        'Supervised learning on recorded human games',
+        'Q-learning with a table of positions',
+      ],
+      answer: 1,
+      why: 'Credit assignment across forty plies from a single win/lose bit is exactly what reflex-style reinforcement learning is worst at, and a table cannot hold 4.5 trillion positions. When you can afford to think, searching ahead sidesteps the problem: the search finds the tactic the network missed, and the network is then trained to expect it. Human games would work too, but only where they exist, and they cap you at human strength.',
+    },
+    {
       q: 'Two agents train against each other and both look competent, but you cannot tell whether either is improving.',
       options: [
         'Watch the reward curve for longer',

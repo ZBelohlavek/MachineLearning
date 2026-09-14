@@ -24,6 +24,7 @@ python3 -m http.server 8000     # then open http://localhost:8000
 | **[Teach a model to write](lessons/language.html)** | Train a character-level transformer on text you choose and read what it writes | Tokenisation, causal attention, next-token prediction, temperature |
 | **[Q-Learning](lessons/gridworld.html)** | Build a maze, watch a value table fill in square by square, then race the agent through it | States, actions, rewards, the Bellman update, exploration vs exploitation |
 | **[Evolve a driver](lessons/evolve-a-driver.html)** | Watch sixty cars learn to drive a track you drew, then race the champion | Neuroevolution, fitness functions, selection and mutation, gradient-free learning |
+| **[Teach a model to search](lessons/connect4.html)** | Play Connect 4 against an agent that plans ahead, then train one by self-play | Monte Carlo tree search, PUCT, policy and value heads, AlphaZero's training loop |
 | **[Rocket League Bot](lessons/rocket-league.html)** | Design the reward function and train a self-play agent to score | Policy gradients, PPO, advantage estimation, reward shaping, self-play |
 | **[Final challenge](lessons/final-challenge.html)** | Pick the right approach for nine situations, then diagnose four training runs from their curves | Judgement: matching method to problem, and reading failure from a chart |
 
@@ -50,7 +51,7 @@ and badges only unlock for models you trained yourself.
 
 ## The games
 
-Four lessons carry a real game, each one scored against a model you trained, so getting better at
+Five lessons carry a real game, each one scored against a model you trained, so getting better at
 the game and getting better at the machine learning are the same activity:
 
 | Game | Where | How it is scored |
@@ -59,6 +60,7 @@ the game and getting better at the machine learning are the same activity:
 | **Ghost time trial** | Evolve a driver | Beat the evolved champion, then your own fastest lap, replayed as a translucent ghost car. Medal times are per course. |
 | **Maze race** | Q-Learning | You and the agent leave the start square together and the shorter route wins. Gold is the shortest path a breadth-first search can find. |
 | **Digit duel** | Train a CNN | Sixty seconds, one called digit at a time, with a multiplier for consecutive hits and a bonus for drawing fast. |
+| **Beat the bot** | Teach a model to search | Connect 4 against a ladder of self-play checkpoints, with a slider for how long it thinks. Medals for win streaks. |
 
 Personal bests and saved ghost laps live in `localStorage` under `mlbb-best-*` and `mlbb-ghost-*`,
 and travel with the progress export on the home page. Sound is on by default and every game has a
@@ -67,7 +69,7 @@ motion.
 
 ## Goals, challenges and quizzes
 
-Thirty-four badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
+Thirty-eight badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
 on the home page. None are for clicking around — each falls into one of three kinds:
 
 - **Things your model does.** Evolve a car that finishes the course, train a bot that beats the
@@ -113,6 +115,7 @@ assets/js/lib/
   charlm.js   A character-level causal transformer built from the same pieces
   digits.js   A digit dataset generated with the canvas text API
   plot.js     Canvas line charts and colour maps
+  mcts.js     Monte Carlo tree search with PUCT, for the AlphaZero lesson
   ui.js       Shared page chrome, sliders, pills, stat tiles, badges, quizzes
   arcade.js   Game feel: personal bests, medal tiers, combo streaks, particles,
               screen shake, countdowns and a small synthesised sound kit
