@@ -137,7 +137,11 @@
       }
       if (!isFinite(lo) || !isFinite(hi)) { lo = 0; hi = 1; }
       if (hi - lo < 1e-9) { hi = lo + 1; lo -= 0.5; }
-      const padY = (hi - lo) * 0.08; lo -= padY; hi += padY;
+      // Only pad the ends that were computed from the data. A caller who pins
+      // yMax to 100 for a percentage means 100, not 108.
+      const padY = (hi - lo) * 0.08;
+      if (this.opts.yMin == null) lo -= padY;
+      if (this.opts.yMax == null) hi += padY;
 
       const n = this.xs.length;
       let x0 = this.xs[0] ?? 0, x1 = this.xs[n - 1] ?? 1;

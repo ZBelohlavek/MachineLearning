@@ -389,8 +389,12 @@
         tctx.textAlign = 'center';
         tctx.fillText(String(a + 1), a * bw + bw / 2, H - 5);
         if (lastVisits[a] > 0) {
-          tctx.fillStyle = a === bestA ? '#cfe6ff' : 'rgba(159,176,204,.7)';
-          tctx.fillText(String(lastVisits[a] | 0), a * bw + bw / 2, H - 22 - h);
+          // A tall bar pushes its own label off the top of the canvas, so the
+          // count moves inside the bar once there is no room above it.
+          const above = H - 22 - h;
+          const inside = above < 12;
+          tctx.fillStyle = inside ? '#0b1220' : (a === bestA ? '#cfe6ff' : 'rgba(159,176,204,.7)');
+          tctx.fillText(String(lastVisits[a] | 0), a * bw + bw / 2, inside ? H - 24 - h + 14 : above);
         }
       }
     }
