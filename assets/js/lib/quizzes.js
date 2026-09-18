@@ -371,6 +371,45 @@
         },
       ],
     },
+    kitchen: {
+      id: 'kitchen', badge: 'quiz-kitchen',
+      title: 'Check yourself \u00b7 cooperation',
+      questions: [
+        {
+          q: 'Two agents are trained by identical self-play, differing only in random seed. Each is good with a copy of itself and much worse with the other. What went wrong?',
+          options: [
+            'One of them was undertrained',
+            'Nothing broke \u2014 each learned a convention that assumed its partner was itself',
+            'The random seed was not applied correctly',
+            'The reward function was mis-specified',
+          ],
+          answer: 1,
+          why: 'Self-play optimises a pair, and a pair is free to agree on anything: who fetches, who plates, which way round the counter everyone walks. The agreement is worth real points and costs nothing to make, so it gets made \u2014 and it is completely invisible until a partner turns up who was not at the meeting. Both agents are individually fine. What neither has is any reason to be understandable.',
+        },
+        {
+          q: 'You set the entropy bonus to zero and train the kitchen agent for thousands of episodes. It never serves a single soup. Why does this task punish that so severely?',
+          options: [
+            'Zero entropy makes the gradient undefined',
+            'The chain from an empty kitchen to a served soup is six steps, which random play almost never completes',
+            'The policy network is too small without it',
+            'Entropy is required for the reward shaping to work',
+          ],
+          answer: 1,
+          why: 'Onion, onion, onion, wait, plate, serve. Every link has to be stumbled into before the reward at the end is ever seen, and a policy that stops experimenting stops finding the next link. In a one-step task an exploration bonus is a nicety; in a six-step chain it is the difference between a working agent and a flat line. Measured here: the same settings reach the scripted pair\u2019s score with the bonus on and score zero with it off.',
+        },
+        {
+          q: 'The by-the-book cook is simpler than either trained agent, yet it is the easier partner for a human. Why?',
+          options: [
+            'It moves faster',
+            'It has no private convention to guess, and it routes around whoever is in the way',
+            'It was trained on human data',
+            'It gets a larger share of the reward',
+          ],
+          answer: 1,
+          why: 'Being predictable is worth more than being strong when someone has to work alongside you. The scripted cook follows the recipe and steps around obstacles, so anything you do is compatible with it. The self-play agents are better in their own company and harder for anyone else to fit around. Anything that has to work with a person \u2014 a car, a negotiator, an assistant \u2014 faces this trade, and the usual fix is to train against a deliberately varied population rather than against yourself.',
+        },
+      ],
+    },
     racer: {
       id: 'racer', badge: 'quiz-racer',
       title: 'Check yourself · evolution',

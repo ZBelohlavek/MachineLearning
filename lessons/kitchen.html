@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cooking with a stranger · Learn ML by Building</title>
+<meta name="description" content="Overcooked for two: a cooperative agent trained by self-play, and the reason it falls apart the moment it works with someone it has never met.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  #kitchen { width: 100%; background: #0d1320; border: 1px solid var(--line); border-radius: 12px; }
+  .legend-k { display: flex; flex-wrap: wrap; gap: 14px; font-size: .82rem; color: var(--text-dim); margin-top: 10px; }
+  .legend-k i { width: 13px; height: 13px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 6px; }
+  .recipe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .86rem; color: var(--text-dim); }
+  .recipe b { color: var(--text); }
+  .recipe .arrow { color: var(--text-mute); }
+  .pairing { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .pairing th { text-align: left; color: var(--text-mute); font-weight: 500; font-size: .74rem;
+                text-transform: uppercase; letter-spacing: .07em; padding: 7px 8px; }
+  .pairing td { padding: 8px; border-bottom: 1px solid var(--line-soft); }
+  .pairing td.n { font-family: var(--mono); text-align: right; color: var(--text); }
+  .pairing tr.good td.n { color: var(--good); }
+  .pairing tr.bad td.n { color: var(--bad); }
+  .pairing .bar { height: 8px; border-radius: 4px; background: var(--line-soft); overflow: hidden; min-width: 60px; }
+  .pairing .bar i { display: block; height: 100%; background: var(--accent); }
+  .pairing tr.good .bar i { background: var(--good); }
+  .pairing tr.bad .bar i { background: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Multi-agent · cooperation</div>
+    <h1>Cooking with a stranger</h1>
+    <p class="lead">
+      Every other agent on this site had someone to beat. This one has someone to help, and that turns
+      out to be a different problem. Two cooks share one kitchen and one score, and the only way to fail
+      is to get in each other's way. Train a pair by self-play and they become good partners — for each
+      other, specifically.
+    </p>
+  </div>
+
+  <div id="lesson-goals"></div>
+
+  <div class="section">
+    <h2>Work the shift</h2>
+    <p>
+      You are the blue cook. Arrow keys to move, space to use whatever you are standing next to.
+      Three onions into the pot, wait for it to cook, bring a plate, then run the soup to the hatch.
+      Your partner is an agent; pick which one below.
+    </p>
+    <div class="recipe">
+      <b>onion</b><span class="arrow">→</span><b>pot ×3</b><span class="arrow">→</span>
+      <b>wait</b><span class="arrow">→</span><b>plate</b><span class="arrow">→</span>
+      <b>pot</b><span class="arrow">→</span><b>hatch</b>
+    </div>
+
+    <div class="split" style="margin-top:16px">
+      <div class="panel game-panel" id="game-panel">
+        <div class="panel-title">
+          <h3><span class="game-tag">game</span> The kitchen</h3>
+          <span class="hint" id="shift-note">press start</span>
+        </div>
+        <div class="stage" id="kitchen-stage">
+          <canvas id="kitchen" role="img" aria-label="A small kitchen with two cooks, an onion crate, a plate rack, a pot and a serving hatch."></canvas>
+        </div>
+        <div class="legend-k">
+          <span><i style="background:#4da3ff"></i>you</span>
+          <span><i style="background:#ff9f45"></i>your partner</span>
+          <span><i style="background:#8d6b3f"></i>onions</span>
+          <span><i style="background:#9fb0cc"></i>plates</span>
+          <span><i style="background:#c0533f"></i>pot</span>
+          <span><i style="background:#38d39f"></i>hatch</span>
+        </div>
+        <div id="k-hud"></div>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-start" class="primary">▶ Start the shift</button>
+          <span id="k-sound"></span>
+        </div>
+        <div class="keycap-row" style="margin-top:10px">
+          <span class="kbd-hint"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> move · <kbd>space</kbd> use</span>
+        </div>
+        <div class="keycap-row" style="margin-top:8px">
+          <div id="k-pad"></div>
+          <button id="btn-use">Use station</button>
+        </div>
+        <div id="k-result" class="result-line"></div>
+        <div class="medal-track" id="k-medals"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>Your partner</h3></div>
+        <div id="partner-mode"></div>
+        <p class="muted" style="font-size:.84rem;margin-top:12px" id="partner-note"></p>
+        <div class="panel-title" style="margin-top:20px"><h3>This shift</h3></div>
+        <div id="shift-stats"></div>
+        <p class="muted" style="font-size:.8rem;margin:12px 0 0">
+          Collisions are the coordination cost, counted every tick you both want the same square.
+          A well-matched pair has very few. A mismatched pair spends the shift shuffling.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>The result this lesson exists for</h2>
+    <p>
+      Two agents were trained here by identical self-play, differing only in random seed. Each played
+      thousands of shifts against a copy of itself. Then I paired them with somebody else, and measured
+      what happened rather than assuming it.
+    </p>
+    <div class="panel">
+      <table class="pairing" id="pairing-table"><tbody></tbody></table>
+      <p class="muted" style="font-size:.84rem;margin:14px 0 0" id="pairing-note"></p>
+    </div>
+    <p style="margin-top:16px">
+      Both agents beat two by-the-book cooks when working with a copy of themselves. Put either next to
+      a cook it has never met and it falls back to roughly what the by-the-book pair already managed —
+      about a quarter of its advantage survives. Put the two trained agents together and they do
+      <em>worse</em> than two plain scripted cooks, which is the part I did not expect: two individually
+      strong players, each with a plan, and the plans do not fit.
+    </p>
+    <p>
+      The advantage they lose is a convention. Self-play optimises a pair, and a pair is free to agree
+      on anything: who fetches, who plates, which way round the counter everyone walks. The agreement is
+      worth real points and costs nothing to make, so it gets made — and none of it survives contact with
+      anyone who was not at the meeting.
+    </p>
+    <div class="note warn">
+      <b class="label">Four of six runs never learned at all</b>
+      <p class="mb0">Worth knowing before you train your own. With identical settings and only the
+      seed changed, four of the six runs behind this page plateaued serving one soup a shift and
+      never improved; two reached six or better. The two good ones are what ships. That is ordinary
+      practice and rarely mentioned, which is exactly why it is mentioned here: a single run tells
+      you very little about a method on a task with a reward chain this long.</p>
+    </div>
+
+    <div class="note warn" style="margin-top:14px">
+      <b class="label">Why this matters beyond a kitchen</b>
+      <p class="mb0">
+        Anything meant to work alongside a person hits this: a driving policy trained against copies of
+        itself, a negotiating agent trained against itself, a recommender trained against a model of a user
+        rather than a user. Each learns a convention with whoever it trained against, and a person is not
+        that. The usual fix is to train against a deliberately varied population of partners, which costs
+        more and gives up some of the top-end score in exchange for a partner that works with anyone.
+      </p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Train one yourself</h2>
+    <p>
+      Two cooks, one shared network, one score. It learns from a shaped reward: a little for picking
+      up the right thing, more for filling the pot, a lot for serving. The chain from an empty
+      kitchen to a served soup is six steps, which is far too long to stumble into by accident, and
+      that shapes everything about how it has to be taught.
+    </p>
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>Progress</h3></div>
+        <div id="train-stats"></div>
+        <div class="controls" style="margin-top:14px">
+          <button id="btn-train" class="primary">▶ Start self-play</button>
+          <button id="btn-test">Test the pairings</button>
+          <button id="btn-train-reset" class="danger">Start over</button>
+        </div>
+        <div id="run-bar"></div>
+        <canvas id="k-chart" class="fit" style="margin-top:14px" role="img" aria-label="Soups served per shift against episodes of self-play."></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Hyperparameters</h3></div>
+        <div id="k-hp"></div>
+        <div class="note" style="margin-top:14px">
+          <b class="label">The exploration bonus is not optional here</b>
+          <p class="mb0">With the entropy bonus set to zero this policy commits to a habit within a
+          few hundred episodes and never serves a single soup, however long you leave it. Turn it
+          down to zero and watch: the score line flattens at nothing. Six-step reward chains do not
+          forgive an agent that stops trying things.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li>
+        <b>Play a shift with each partner in turn.</b> The self-play agent expects a particular dance and
+        keeps walking into you when you don't do it. The by-the-book cook is duller and easier to work
+        with. Watch the collision counter more than the score: the relationship shows up there first.
+      </li>
+      <li><b>Stand still for a whole shift.</b> See how many soups your partner manages alone. The
+        self-play agents are notably bad at this: they learned to rely on a second pair of hands
+        that always did the right half of the job.</li>
+      <li><b>Set the entropy bonus to zero and train.</b> The score line never leaves the floor.
+        This is the clearest demonstration on the site of exploration being load-bearing rather
+        than decorative.</li>
+      <li><b>Train two of your own with different seeds</b> using the seed control, then test the
+        pairings. You should see the same collapse, on agents you made.</li>
+      <li><b>Watch the collision counter rather than the score.</b> It tells you about the
+        relationship rather than the result, and it moves first — a mismatched pair is colliding
+        long before the score gap is obvious.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on the shift you just worked. You can't fail this — the explanation appears
+      either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/arcade.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
+<script src="../assets/models/kitchen-agents.js"></script>
+<script src="../assets/js/lessons/kitchen-env.js"></script>
+<script src="../assets/js/lessons/kitchen-train.js"></script>
+<script src="../assets/js/lessons/kitchen.js"></script>
+</body>
+</html>

@@ -694,6 +694,41 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- the kitchen: a shift, a partner, and the pairing table ---- */
+  {
+    const page = await open('lessons/kitchen.html');
+    await page.waitForTimeout(1200);
+    check('kitchen · the pairing table is filled from the trained run',
+          (await page.locator('#pairing-table tr').count()) >= 4);
+    check('kitchen · and reports the edge that is lost',
+          /keeps \d+% of that edge/.test(await page.textContent('#pairing-note')),
+          '→ ' + (await page.textContent('#pairing-note')).replace(/\s+/g, ' ').slice(-70));
+    check('kitchen · both trained agents and the scripted cook are offered',
+          (await page.locator('#partner-mode .pill').count()) === 3);
+
+    // A shift must actually run, and the partner must work the recipe.
+    await page.click('#btn-start');
+    await page.evaluate(() => window.__kitchen.setPartner('scripted'));
+    await page.waitForTimeout(5000);
+    const st = await page.evaluate(() => ({
+      tick: window.__kitchen.kitchen.tick,
+      pot: window.__kitchen.kitchen.potOnions,
+      ready: window.__kitchen.kitchen.potReady,
+      holds: window.__kitchen.kitchen.cooks[1].hold,
+    }));
+    check('kitchen · the shift clock runs', st.tick > 20, `(${st.tick} ticks)`);
+    check('kitchen · the partner works the recipe unaided',
+          st.pot > 0 || st.ready || st.holds !== 0, JSON.stringify(st));
+
+    // Self-play training must run in the page.
+    await page.click('#btn-train');
+    await page.waitForTimeout(6000);
+    await page.click('#btn-train');
+    const eps = await page.evaluate(() => window.__kitchen.trainer.episodes);
+    check('kitchen · self-play trains in the browser', eps > 20, `(${eps} episodes)`);
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();

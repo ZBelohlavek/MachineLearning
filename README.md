@@ -27,6 +27,7 @@ python3 -m http.server 8000     # then open http://localhost:8000
 | **[Teach a model to search](lessons/connect4.html)** | Play Connect 4 against an agent that plans ahead, then train one by self-play | Monte Carlo tree search, PUCT, policy and value heads, AlphaZero's training loop |
 | **[Guessing with information](lessons/wordle.html)** | Race a Wordle solver that weighs every guess in bits | Entropy, expected information gain, greedy search, optimising the mean versus the worst case |
 | **[Learning to be unpredictable](lessons/fighter.html)** | Fight an agent that reads your habits, and one that gives nothing away | Zero-sum games, Nash equilibria, regret matching, exploitability, best response |
+| **[Cooking with a stranger](lessons/kitchen.html)** | Share a kitchen with an agent trained by playing itself | Cooperative multi-agent RL, policy gradients, conventions, why self-play partners fail with people |
 | **[Rocket League Bot](lessons/rocket-league.html)** | Design the reward function and train a self-play agent to score | Policy gradients, PPO, advantage estimation, reward shaping, self-play |
 | **[Final challenge](lessons/final-challenge.html)** | Pick the right approach for nine situations, then diagnose four training runs from their curves | Judgement: matching method to problem, and reading failure from a chart |
 
@@ -53,7 +54,7 @@ and badges only unlock for models you trained yourself.
 
 ## The games
 
-Seven lessons carry a real game, each one scored against a model you trained, so getting better at
+Eight lessons carry a real game, each one scored against a model you trained, so getting better at
 the game and getting better at the machine learning are the same activity:
 
 | Game | Where | How it is scored |
@@ -62,6 +63,7 @@ the game and getting better at the machine learning are the same activity:
 | **Ghost time trial** | Evolve a driver | Beat the evolved champion, then your own fastest lap, replayed as a translucent ghost car. Medal times are per course. |
 | **Maze race** | Q-Learning | You and the agent leave the start square together and the shorter route wins. Gold is the shortest path a breadth-first search can find. |
 | **Digit duel** | Train a CNN | Sixty seconds, one called digit at a time, with a multiplier for consecutive hits and a bonus for drawing fast. |
+| **The shift** | Cooking with a stranger | A two-cook kitchen where the only way to lose is to get in each other's way. Medals for soups served. |
 | **The mixup** | Learning to be unpredictable | A fighting-game exchange with a live meter for how readable you are. Medals for getting ahead of the reader. |
 | **Race the solver** | Guessing with information | Wordle against a solver that always plays the most informative word. It is beatable, because it has no idea which words are common. |
 | **Beat the bot** | Teach a model to search | Connect 4 against a ladder of self-play checkpoints, with a slider for how long it thinks. Medals for win streaks. |
@@ -73,7 +75,7 @@ motion.
 
 ## Goals, challenges and quizzes
 
-Forty-six badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
+Fifty badges, tracked in `localStorage`, listed inside each lesson as you work and summarised
 on the home page. None are for clicking around — each falls into one of three kinds:
 
 - **Things your model does.** Evolve a car that finishes the course, train a bot that beats the

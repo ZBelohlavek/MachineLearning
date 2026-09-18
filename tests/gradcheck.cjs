@@ -677,6 +677,78 @@ for (const cfg of [
   }
 }
 
+/* ------------------------------------------------- the kitchen (cooperation)
+   The environment has to be solvable and the collision rule has to not
+   deadlock, both of which were wrong on the first attempt. */
+{
+  const { Kitchen, KITCHEN: K } = require('../assets/js/lessons/kitchen-env.js');
+  const cases = [];
+
+  cases.push(['kitchen: the observation is the size the policy expects',
+    new Kitchen().observe(0).length === K.OBS]);
+
+  {
+    // Both cooks seeing a mirrored view is what lets one network play either
+    // role, exactly as in the Rocket League and Connect 4 encoders.
+    const k = new Kitchen();
+    const a = Float32Array.from(k.observe(0));
+    const b = Float32Array.from(k.observe(1));
+    cases.push(['kitchen: each cook sees itself first', a[0] !== b[0] || a[1] !== b[1]]);
+  }
+
+  {
+    // Two cooks with the same idea must not freeze forever: the first version
+    // blocked both movers and deadlocked for the whole shift.
+    let served = 0, collisions = 0;
+    for (let run = 0; run < 10; run++) {
+      const k = new Kitchen({ maxTicks: 300 });
+      for (let t = 0; t < 300; t++) k.step([K.scriptedCook(k, 0), K.scriptedCook(k, 1)]);
+      served += k.served; collisions += k.collisions;
+    }
+    cases.push([`kitchen: two by-the-book cooks actually serve soup (${(served / 10).toFixed(1)} per shift)`,
+      served / 10 >= 3]);
+    cases.push([`kitchen: and do not spend the shift deadlocked (${(collisions / 10).toFixed(0)} collisions)`,
+      collisions / 10 < 250]);
+  }
+
+  {
+    // One cook alone should still be able to complete the whole recipe, or the
+    // "stand still and watch" experiment in the lesson would be meaningless.
+    const k = new Kitchen({ maxTicks: 400 });
+    for (let t = 0; t < 400; t++) k.step([4, K.scriptedCook(k, 1)]);
+    cases.push([`kitchen: one cook can run the whole recipe alone (${k.served} soups)`, k.served >= 1]);
+  }
+
+  {
+    // The recipe must be enforced: no soup without three onions and a plate.
+    const k = new Kitchen();
+    k.cooks[0] = { x: 3, y: 1, hold: K.HOLD.PLATE };
+    k.potOnions = 1; k.potReady = false;
+    k.interact(0);
+    cases.push(['kitchen: you cannot plate a pot that has not cooked',
+      k.cooks[0].hold === K.HOLD.PLATE]);
+    k.potOnions = K.NEEDED; k.potReady = true;
+    k.interact(0);
+    cases.push(['kitchen: you can plate a pot that has', k.cooks[0].hold === K.HOLD.SOUP]);
+  }
+
+  {
+    // Serving requires the hatch, not just holding soup.
+    const k = new Kitchen();
+    k.cooks[0] = { x: 1, y: 1, hold: K.HOLD.SOUP };   // next to the onions, not the hatch
+    k.interact(0);
+    cases.push(['kitchen: soup only scores at the hatch', k.served === 0]);
+    k.cooks[0] = { x: 5, y: 1, hold: K.HOLD.SOUP };
+    k.interact(0);
+    cases.push(['kitchen: and does score there', k.served === 1]);
+  }
+
+  for (const [name, ok] of cases) {
+    if (!ok) failures++;
+    console.log(`${ok ? '  ok  ' : ' FAIL '} ${('kitchen  ' + name).padEnd(72)}`);
+  }
+}
+
 console.log(failures === 0
   ? '\nAll checks passed.'
   : `\n${failures} check(s) failed.`);
