@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optimising without a gradient · Learn ML by Building</title>
+<meta name="description" content="Build a Factorio production line, then watch a search beat it. Combinatorial optimisation, simulated annealing, and why random sampling finds nothing at all.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  #grid, #best-grid { width: 100%; background: #0b1220; border: 1px solid var(--line); border-radius: 12px; }
+  #grid { cursor: pointer; }
+  .tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 7px; }
+  .tool { padding: 9px 8px; border-radius: var(--radius-sm); background: var(--panel-2);
+          border: 1px solid var(--line); color: var(--text-dim); cursor: pointer; text-align: left; }
+  .tool.on { border-color: var(--accent); background: rgba(77,163,255,.14); color: var(--text); }
+  .tool b { display: block; font-size: .86rem; color: var(--text); }
+  .tool span { font-size: .7rem; color: var(--text-mute); }
+  .budget { height: 12px; border-radius: 7px; background: var(--line-soft); overflow: hidden; margin-top: 6px; }
+  .budget i { display: block; height: 100%; background: var(--good); transition: width .2s ease; }
+  .budget i.over { background: var(--bad); }
+  .legend-f { display: flex; flex-wrap: wrap; gap: 13px; font-size: .8rem; color: var(--text-dim); margin-top: 10px; }
+  .legend-f i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 5px; }
+  #search-chart { width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #0a0f19; }
+  .cmp3 { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .cmp3 th { text-align: left; color: var(--text-mute); font-weight: 500; font-size: .74rem;
+             text-transform: uppercase; letter-spacing: .07em; padding: 7px 8px; }
+  .cmp3 td { padding: 8px; border-bottom: 1px solid var(--line-soft); }
+  .cmp3 td.n { font-family: var(--mono); text-align: right; color: var(--text); }
+  .cmp3 tr.zero td.n { color: var(--bad); }
+  .cmp3 tr.win td.n { color: var(--good); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Combinatorial optimisation · no gradient</div>
+    <h1>Optimising without a gradient</h1>
+    <p class="lead">
+      Build a production line: ore from the mine, plates from a smelter, gears from an assembler,
+      out through the depot. What is being optimised here is not a set of weights but a
+      <em>layout</em> — a pile of discrete choices with no derivative anywhere in it. You cannot
+      differentiate a conveyor belt. So how do you improve one?
+    </p>
+  </div>
+
+  <div id="lesson-goals"></div>
+
+  <div class="section">
+    <h2>Build a factory</h2>
+    <p>
+      Click to place, click again to rotate a belt. Everything costs from the same budget, so the
+      question is not "does it work" but "what is the most throughput I can buy". Then press run and
+      count the gears.
+    </p>
+
+    <div class="split">
+      <div class="panel game-panel" id="game-panel">
+        <div class="panel-title">
+          <h3><span class="game-tag">game</span> Your line</h3>
+          <span class="hint" id="build-note">place a belt next to the mine</span>
+        </div>
+        <canvas id="grid" role="img" aria-label="A factory grid with a mine, a depot, rocks and whatever you have built."></canvas>
+        <div class="legend-f">
+          <span><i style="background:#6f8bd0"></i>belt</span>
+          <span><i style="background:#c0533f"></i>smelter</span>
+          <span><i style="background:#7c5cff"></i>assembler</span>
+          <span><i style="background:#8d6b3f"></i>mine</span>
+          <span><i style="background:#38d39f"></i>depot</span>
+          <span><i style="background:#3a4560"></i>rock</span>
+        </div>
+        <div id="f-hud"></div>
+        <div class="tools" style="margin-top:12px" id="tools"></div>
+        <div style="margin-top:12px">
+          <div class="field"><label class="row"><span>budget</span><b id="cost-label">0 / 40</b></label></div>
+          <div class="budget"><i id="cost-bar"></i></div>
+        </div>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-run" class="primary">▶ Run the factory</button>
+          <button id="btn-example">Give me a starting line</button>
+          <button id="btn-clear" class="danger">Clear</button>
+          <span id="f-sound"></span>
+        </div>
+        <div id="f-result" class="result-line"></div>
+        <div class="medal-track" id="f-medals"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>The recipe</h3></div>
+        <p class="muted" style="font-size:.86rem;margin:0 0 12px">
+          The mine pushes one ore a tick into whatever is next to it. A belt carries its item one
+          square a tick in the direction it faces. A smelter turns ore into a plate in four ticks;
+          an assembler turns a plate into a gear in six. Gears that reach the depot score. Anything
+          that walks off the end of a belt is lost.
+        </p>
+        <div class="panel-title"><h3>Costs</h3></div>
+        <div id="cost-table"></div>
+        <div class="panel-title" style="margin-top:18px"><h3>What happened</h3></div>
+        <div id="run-stats"></div>
+        <p class="muted" style="font-size:.8rem;margin:12px 0 0">
+          Ore smelted and plates made are worth watching even when no gears come out. They are the
+          only sign that the first half of your line works, and they are exactly the signal the
+          search below needs in order to get anywhere.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>There is nothing here to differentiate</h2>
+    <p>
+      Every other lesson on this site improves something by asking which way to nudge it. That
+      question has no answer here. A belt is either there or not; it faces one of four directions;
+      an assembler cannot be moved half a square. The objective is the output of a simulation, and
+      the space of layouts is discrete, enormous and mostly worthless.
+    </p>
+    <p>
+      Worse, it is almost entirely flat. A layout one assembler short of working produces exactly
+      what an empty map produces: nothing. There is no slope leading towards a solution, because
+      until the last piece is in place every partial factory scores the same zero.
+    </p>
+    <div class="note warn">
+      <b class="label">Which is the sparse-reward problem again</b>
+      <p class="mb0">The Rocket League agent could not learn from goals alone because a goal arrives
+      once in three hundred decisions. This is the same shape of problem with no learning in it at
+      all: the search needed partial credit for getting ore into a smelter and plates out of one,
+      or it never found a single working factory. Shaping is not a reinforcement learning trick. It
+      is what you do whenever the thing you actually want is too rare to steer by.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>So change things at random and keep what helps</h2>
+    <p>
+      Simulated annealing, which is about as old as computing and still hard to beat here. Make a
+      random edit. If it helped, keep it. If it hurt, keep it anyway with a probability that starts
+      high and falls — because a layout that is locally fine and globally mediocre can only be
+      escaped by accepting something worse on the way out.
+    </p>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>Best layout found</h3><span class="hint" id="search-state"></span></div>
+        <canvas id="best-grid" role="img" aria-label="The best factory layout the search has found so far."></canvas>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-search" class="primary">▶ Run the search</button>
+          <button id="btn-search-reset" class="small">Start over</button>
+          <button id="btn-copy">Copy it to my grid</button>
+        </div>
+        <div id="search-stats" style="margin-top:12px"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Best throughput over time</h3></div>
+        <canvas id="search-chart" role="img" aria-label="Best throughput found by the search against steps."></canvas>
+        <p class="muted" style="font-size:.82rem;margin:12px 0 0">
+          It climbs in steps rather than smoothly, and sits on plateaus for thousands of edits at a
+          time. Each jump is a structural change that finally paid off — usually an assembler
+          appearing, paid for by belts removed elsewhere.
+        </p>
+        <div class="panel-title" style="margin-top:18px"><h3>Settings</h3></div>
+        <div id="search-hp"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Does the search actually earn its keep?</h2>
+    <p>
+      Worth checking against the obvious alternative: generate a great many random layouts and keep
+      the best one. Both approaches are given the same simulator and the same budget.
+    </p>
+    <div class="panel">
+      <table class="cmp3" id="compare-table"><tbody></tbody></table>
+      <p class="muted" style="font-size:.84rem;margin:14px 0 0" id="compare-note">Trying twenty
+      thousand random layouts, a few hundred at a time, so the page stays usable while it runs…</p>
+    </div>
+    <p style="margin-top:16px">
+      Random sampling finds nothing whatsoever, and would keep finding nothing however long you ran
+      it, because working factories are a vanishingly thin slice of the space. The annealer finds
+      one every time. The difference between them is not cleverness — it is that one of them keeps
+      partial progress and builds on it, and the other throws away everything it has learned after
+      each attempt.
+    </p>
+    <div class="note">
+      <b class="label">The move set mattered more than the algorithm</b>
+      <p class="mb0">Two changes made the difference between a search that worked and one that
+      didn't, and neither was a tuning parameter. First, a move that builds a belt pointing onwards
+      from a piece that already exists, rather than dropping one anywhere. Second, letting a
+      placement clear cheap belts elsewhere to pay for itself — without that, layouts filled up with
+      belts and could never afford the assembler they needed, and the search happily polished a
+      factory that could never produce a gear.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><b>Build a line that makes plates but no gears.</b> Run it. The throughput is zero, and it
+        is exactly as zero as an empty map — which is what the search is up against.</li>
+      <li><b>Beat the optimiser.</b> It usually lands between 14 and 17 gears per hundred ticks.
+        A tight hand-built line with the machines packed close together can do better, because
+        every belt you remove is budget you can spend on another machine.</li>
+      <li><b>Halve the budget.</b> The problem changes character completely: with very little to
+        spend, the search has to find the shortest possible path, and the answer stops looking like
+        the one a person would draw.</li>
+      <li><b>Turn the temperature to zero.</b> That is plain hill climbing. It gets stuck in the
+        first decent layout it stumbles into and stays there.</li>
+      <li><b>Watch the plateaus on the chart.</b> Thousands of edits with no improvement, then a
+        jump. That is the shape of searching a space where most of the neighbours of a good answer
+        are worthless.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on the factory you just built. You can't fail this — the explanation appears
+      either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/arcade.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
+<script src="../assets/js/lessons/factory-env.js"></script>
+<script src="../assets/js/lessons/factory-search.js"></script>
+<script src="../assets/js/lessons/factory.js"></script>
+</body>
+</html>

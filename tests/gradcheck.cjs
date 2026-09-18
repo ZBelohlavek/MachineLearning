@@ -749,6 +749,64 @@ for (const cfg of [
   }
 }
 
+/* ------------------------------------------------ the factory (no gradient)
+   The simulator has to be right before any claim about the search means
+   anything, and the sparse-landscape claim the lesson rests on is checkable. */
+{
+  const { Factory, FACTORY: F } = require('../assets/js/lessons/factory-env.js');
+  const { FactorySearch, handBuilt, randomSearch } = require('../assets/js/lessons/factory-search.js');
+  const cases = [];
+
+  {
+    const f = handBuilt(40);
+    const s = f.score(300);
+    cases.push([`factory: a plain hand-built line works (${s.throughput.toFixed(1)} per 100 ticks)`,
+      s.produced > 0]);
+    cases.push([`factory: and fits the budget (${s.cost} of 40)`, s.cost <= 40]);
+  }
+  {
+    // The recipe must be enforced end to end: no assembler, no gears.
+    const f = new Factory({ budget: 40 });
+    for (let x = 1; x < 3; x++) f.place(x, 3, F.BELT, 1);
+    f.place(3, 3, F.SMELTER);
+    for (let x = 4; x < 9; x++) f.place(x, 3, F.BELT, 1);
+    const s = f.score(300);
+    cases.push(['factory: plates alone never reach the depot as gears', s.produced === 0]);
+    cases.push([`factory: but the first half still registers (${s.platesMade} plates)`, s.platesMade > 0]);
+  }
+  {
+    const f = new Factory({ budget: 5 });
+    for (let x = 1; x < 4; x++) f.place(x, 3, F.BELT, 1);
+    f.place(4, 3, F.SMELTER);
+    cases.push(['factory: going over budget invalidates a layout', f.score(100).invalid === true]);
+  }
+  {
+    const f = new Factory({ budget: 40 });
+    cases.push(['factory: rocks and the mine cannot be built over',
+      f.place(F.ROCKS[0][0], F.ROCKS[0][1], F.BELT) === false && f.place(0, 3, F.BELT) === false]);
+  }
+  {
+    // The claim the whole lesson rests on: blind sampling finds nothing.
+    const r = randomSearch(4000, 40, 300, 5);
+    cases.push([`factory: random layouts produce nothing (4,000 tried, best ${r.best.toFixed(2)})`,
+      r.best === 0]);
+  }
+  {
+    // …and the annealer does, within a budget a browser can afford.
+    const s = new FactorySearch({ seed: 21, budget: 40, ticks: 300 });
+    const t0 = Date.now();
+    while (Date.now() - t0 < 20000) s.run(1000);
+    const th = s.throughputOf(s.best);
+    cases.push([`factory: annealing finds a working layout (${th.toFixed(2)} per 100 ticks)`, th > 0]);
+    cases.push([`factory: and stays inside the budget (${s.best.cost()} of 40)`, s.best.cost() <= 40]);
+  }
+
+  for (const [name, ok] of cases) {
+    if (!ok) failures++;
+    console.log(`${ok ? '  ok  ' : ' FAIL '} ${('factory  ' + name).padEnd(72)}`);
+  }
+}
+
 console.log(failures === 0
   ? '\nAll checks passed.'
   : `\n${failures} check(s) failed.`);

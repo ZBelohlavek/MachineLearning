@@ -410,6 +410,45 @@
         },
       ],
     },
+    factory: {
+      id: 'factory', badge: 'quiz-factory',
+      title: 'Check yourself \u00b7 optimisation without gradients',
+      questions: [
+        {
+          q: 'Twenty thousand random layouts produced not one working factory, while a search that edits one layout repeatedly finds one every time. What is the difference?',
+          options: [
+            'The search evaluates layouts more accurately',
+            'The search keeps partial progress and builds on it; random sampling throws everything away each try',
+            'Random sampling did not try enough layouts',
+            'The search is allowed a bigger budget',
+          ],
+          answer: 1,
+          why: 'Both get the same simulator and the same budget. Working factories are a vanishingly thin slice of the space, so hitting one by chance is hopeless no matter how many attempts you make \u2014 twenty thousand or twenty million. The annealer never starts from scratch: it holds onto a layout that smelts ore, and looks for edits that add to it. Keeping what works is the entire advantage.',
+        },
+        {
+          q: 'The search reliably reached "makes plates, budget fully spent, no assembler" and stopped improving. What fixed it?',
+          options: [
+            'A lower temperature',
+            'Letting a new machine clear cheap belts elsewhere to pay for itself',
+            'More simulation ticks per candidate',
+            'A larger grid',
+          ],
+          answer: 1,
+          why: 'It had filled the budget with belts and could no longer afford the nine-cost assembler it needed, and no single edit could change that: removing a belt scored worse, and adding the assembler was refused. A structural change has to be allowed to pay for itself. This is a move-set problem rather than a tuning problem, and no amount of adjusting the annealing schedule would have touched it.',
+        },
+        {
+          q: 'A layout that is one assembler short of working scores exactly what an empty grid scores. What does that tell you about the objective?',
+          options: [
+            'The simulation is running for too few ticks',
+            'It is far too sparse to search directly, so the search needs partial credit',
+            'The budget is set too low',
+            'Throughput is the wrong thing to want',
+          ],
+          answer: 1,
+          why: 'Throughput is exactly what you want and exactly what you cannot steer by, because until the last piece is in place every partial factory scores zero. The search only works once it is also paid for ore reaching a smelter and plates coming out of one. This is the sparse-reward problem from the Rocket League lesson with no learning anywhere in it \u2014 shaping is not a reinforcement learning trick, it is what you do whenever the thing you want is too rare to aim at.',
+        },
+      ],
+    },
     racer: {
       id: 'racer', badge: 'quiz-racer',
       title: 'Check yourself · evolution',

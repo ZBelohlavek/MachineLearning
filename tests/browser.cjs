@@ -729,6 +729,34 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- the factory: build it, search it, compare ---- */
+  {
+    const page = await open('lessons/factory.html');
+    await page.waitForTimeout(900);
+    check('factory · four build tools', (await page.locator('#tools .tool').count()) === 4);
+
+    await page.click('#btn-example');
+    await page.click('#btn-run');
+    await page.waitForTimeout(300);
+    const hand = await page.evaluate(() => window.__factory.mine.score(300));
+    check('factory · the example line produces gears', hand.produced > 0,
+          `(${hand.throughput.toFixed(2)} per 100 ticks, cost ${hand.cost})`);
+
+    await page.click('#btn-search');
+    await page.waitForTimeout(20000);
+    await page.click('#btn-search');
+    const th = await page.evaluate(() =>
+      window.__factory.search.throughputOf(window.__factory.search.best));
+    check('factory · the search finds a working layout', th > 0, `(${th.toFixed(2)} per 100 ticks)`);
+
+    await page.waitForFunction(
+      () => /Same simulator/.test(document.getElementById('compare-note').textContent),
+      null, { timeout: 180000 });
+    check('factory · random sampling is measured and finds nothing',
+          /not one working factory/.test(await page.textContent('#compare-note')));
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();
