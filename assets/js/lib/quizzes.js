@@ -410,6 +410,45 @@
         },
       ],
     },
+    draft: {
+      id: 'draft', badge: 'quiz-draft',
+      title: 'Check yourself \u00b7 supervised learning on tabular data',
+      questions: [
+        {
+          q: 'Both models were asked what a known synergy pair is worth, and both rated those pairs above ordinary ones \u2014 including the model with one weight per champion. Why does that not show it learned the synergy?',
+          options: [
+            'The comparison used too few pairs to be reliable',
+            'A champion in many synergy pairs wins more often overall, so a single weight can absorb that without representing any pair',
+            'The linear model was trained for longer',
+            'Synergy pairs are made of stronger champions by construction',
+          ],
+          answer: 1,
+          why: 'Synergy raises a champion\u2019s average win rate, and average win rate is exactly what one weight per champion is good at capturing. So the test was measuring the marginal effect and calling it an interaction. The fix was to measure the interaction directly: prediction with both, minus each alone, plus neither. Everything single-champion cancels, and the linear model\u2019s answer is then not small but algebraically zero.',
+        },
+        {
+          q: 'On six thousand matches the network reached a held-out loss of 2.3 while the linear model sat near 0.6. On twenty thousand the network won clearly. What does that say about capacity?',
+          options: [
+            'The network needed a lower learning rate',
+            'Capacity is a bet on having enough data; the same architecture is better or worse depending on how much you have',
+            'The linear model is the safer choice in general',
+            'Six thousand matches were mislabelled',
+          ],
+          answer: 1,
+          why: 'Nothing about the architecture changed between those two runs. Depth is what makes an interaction representable, and data is what makes it findable \u2014 you need both, and with only one you are worse off than with the simpler model. This is the ordinary case on tabular problems, not an exotic failure.',
+        },
+        {
+          q: 'Accuracy separated the two models by about seven points, while correlation with the true win probability separated them by more than twenty. Why the difference?',
+          options: [
+            'Accuracy was measured on a different test set',
+            'Many matches are decided by raw champion strength, which both models get right; correlation also grades how confident the prediction is and on which matches',
+            'Correlation is a more forgiving metric',
+            'Accuracy is only meaningful above 80%',
+          ],
+          answer: 1,
+          why: 'Picking the winner of a lopsided match takes no subtlety, and lopsided matches are common, so accuracy is largely testing the easy half of the data. Correlation asks whether an 80% team is rated above a 60% one, which is where the interactions live. Choosing the metric is choosing what you are willing to be bad at \u2014 and here the true probability is only available because the simulator is mine.',
+        },
+      ],
+    },
     factory: {
       id: 'factory', badge: 'quiz-factory',
       title: 'Check yourself \u00b7 optimisation without gradients',

@@ -757,6 +757,74 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- the draft: play it, and check the two models really differ ---- */
+  {
+    const page = await open('lessons/draft.html');
+    await page.waitForTimeout(900);
+    check('draft · twenty-four champions in the pool',
+          (await page.locator('#pool .champ').count()) === 24);
+
+    // Play a whole draft through the buttons, the way a person would.
+    for (let i = 0; i < 5; i++) {
+      const btn = page.locator('#pool .champ:not([disabled])').first();
+      await btn.click();
+      await page.waitForTimeout(500);
+    }
+    const teams = await page.evaluate(() => window.__draft.teams);
+    check('draft · both teams end up full',
+          teams.a.length === 5 && teams.b.length === 5);
+    check('draft · nobody was picked twice',
+          new Set(teams.a.concat(teams.b)).size === 10);
+    const result = await page.textContent('#d-result');
+    check('draft · the draft resolves to a win or a loss',
+          /You win|You lose/.test(result), `(${result.trim().slice(0, 24)})`);
+
+    // The claim on the page: the linear model's interaction term is zero.
+    const inter = await page.evaluate(() => {
+      const d = window.__draft;
+      const out = {};
+      for (const k of Object.keys(d.shipped)) {
+        const m = d.shipped[k];
+        out[k] = m.interactions();
+      }
+      return out;
+    });
+    check('draft · the linear model reports no interaction',
+          Math.abs(inter.linear.strong) < 1e-5 && Math.abs(inter.linear.plain) < 1e-5,
+          `(${inter.linear.strong.toExponential(1)})`);
+    check('draft · the network reports one, and only for the real pairs',
+          inter.deep.strong > inter.deep.plain + 0.1,
+          `(${inter.deep.strong.toFixed(3)} vs ${inter.deep.plain.toFixed(3)})`);
+
+    // Its own pick should be its best pick, not an arbitrary one.
+    await page.click('#btn-new');
+    await page.waitForTimeout(200);
+    await page.locator('#pool .champ:not([disabled])').first().click();
+    await page.waitForTimeout(600);
+    const sane = await page.evaluate(() => {
+      const d = window.__draft, t = d.teams, m = d.shipped.deep;
+      if (!m || !t.b.length) return null;
+      const taken = new Set(t.a.concat(t.b));
+      let best = -1, bestP = -Infinity;
+      for (let i = 0; i < d.roster.n; i++) {
+        if (taken.has(i) && i !== t.b[0]) continue;
+        const rest = t.b.slice(1);
+        const p = 1 - m.predict(t.a, rest.concat([i]));
+        if (p > bestP) { bestP = p; best = i; }
+      }
+      return best === t.b[0];
+    });
+    check('draft · it picks what its own model rates highest', sane === true);
+
+    // Training in the page, and the numbers it reports moving.
+    await page.click('#btn-train');
+    await page.waitForTimeout(6000);
+    await page.click('#btn-train');
+    const steps = await page.evaluate(() => window.__draft.live.steps);
+    check('draft · a model trains in the browser', steps > 200, `(${steps} steps)`);
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();

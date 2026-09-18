@@ -20,7 +20,7 @@
     chrome('factory', '../');
     window.ML.quiz(document.getElementById('quiz'), window.ML.QUIZZES.factory);
     window.ML.goalPanel(document.getElementById('lesson-goals'), 'factory');
-    nextLinks(document.getElementById('next-links'), 'kitchen', 'capstone', '../');
+    nextLinks(document.getElementById('next-links'), 'kitchen', 'draft', '../');
 
     const fx = arcade.fx();
     let mine = new Factory({ budget: BUDGET });

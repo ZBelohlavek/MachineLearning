@@ -833,3 +833,14 @@ kbd {
   .arcade-hud { grid-template-columns: repeat(auto-fit, minmax(74px, 1fr)); }
   .hud-value { font-size: 1.12rem; }
 }
+
+/* --- draft lesson: ranked rows and the interaction readout -------------- */
+.row-line { display: flex; justify-content: space-between; align-items: baseline;
+            gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line-soft);
+            font-size: .88rem; }
+.row-line:last-child { border-bottom: 0; }
+.row-line .mono { font-family: var(--mono); }
+.inter-block { margin-bottom: 14px; }
+.inter-block:last-child { margin-bottom: 0; }
+.inter-block h4 { margin: 0 0 4px; font-size: .74rem; letter-spacing: .07em;
+                  text-transform: uppercase; color: var(--text-mute); }

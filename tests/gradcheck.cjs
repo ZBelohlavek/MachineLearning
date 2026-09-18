@@ -807,6 +807,129 @@ for (const cfg of [
   }
 }
 
+/* ------------------------------------------------------ the draft (tabular)
+   The lesson claims a model with one weight per champion cannot represent an
+   interaction, and that the network can. Both are checkable. */
+{
+  const cases = [];
+  const { Roster, DRAFT } = require('../assets/js/lessons/draft-env.js');
+  const { DraftModel } = require('../assets/js/lessons/draft-train.js');
+  const roster = new Roster({ seed: 99 });
+
+  {
+    let syn = 0, ctr = 0;
+    for (let i = 0; i < roster.n; i++) {
+      for (let j = 0; j < roster.n; j++) {
+        if (roster.synergy[i * roster.n + j] !== 0) syn++;
+        if (roster.counter[i * roster.n + j] !== 0) ctr++;
+      }
+    }
+    cases.push([`the roster has structure to find (${syn / 2} synergies, ${ctr} counters)`,
+      syn > 20 && ctr > 20]);
+  }
+  {
+    // Neither side should be favoured, or accuracy means nothing.
+    const ms = roster.matches(4000);
+    const rate = ms.filter((m) => m.win === 1).length / ms.length;
+    cases.push([`neither side of the draft is favoured (${(rate * 100).toFixed(1)}% for team A)`,
+      Math.abs(rate - 0.5) < 0.04]);
+    const spread = Math.max(...ms.map((m) => m.p)) - Math.min(...ms.map((m) => m.p));
+    cases.push([`and the matches vary (win probability spans ${spread.toFixed(2)})`, spread > 0.8]);
+  }
+  {
+    // Swapping the two teams must mirror the probability exactly.
+    const a = [0, 1, 2, 3, 4], b = [5, 6, 7, 8, 9];
+    const p = roster.winProb(a, b), q = roster.winProb(b, a);
+    cases.push([`the draft is symmetric (${p.toFixed(4)} vs ${(1 - q).toFixed(4)})`,
+      Math.abs(p - (1 - q)) < 1e-9]);
+  }
+  {
+    // The heart of the lesson: for a linear model the interaction is not small,
+    // it is algebraically zero, whatever it was trained on.
+    const lin = new DraftModel({ roster, kind: 'linear', hp: { trainMatches: 400, testMatches: 200 } });
+    for (let i = 0; i < 400; i++) lin.trainBatch();
+    const r = lin.interactions();
+    cases.push([`a linear model reports no interaction at all (${r.strong.toExponential(1)})`,
+      Math.abs(r.strong) < 1e-5 && Math.abs(r.plain) < 1e-5]);
+  }
+  {
+    // …and the shipped network reports one that lines up with the truth.
+    const shipped = require('../assets/models/draft-models.js');
+    const deep = shipped.models.find((m) => m.kind === 'deep');
+    const lin = shipped.models.find((m) => m.kind === 'linear');
+    cases.push([`the shipped network separates real pairs from ordinary ones ` +
+      `(${deep.inter.strong.toFixed(3)} vs ${deep.inter.plain.toFixed(3)})`,
+      deep.inter.strong > deep.inter.plain + 0.1]);
+    cases.push([`and its interactions track the real ones (r = ${deep.inter.correlation.toFixed(2)})`,
+      deep.inter.correlation > 0.2]);
+    cases.push([`the network beats the linear model on held-out loss ` +
+      `(${deep.loss.toFixed(3)} vs ${lin.loss.toFixed(3)})`, deep.loss < lin.loss]);
+    cases.push([`and tracks the true win probability far better ` +
+      `(${deep.correlation.toFixed(2)} vs ${lin.correlation.toFixed(2)})`,
+      deep.correlation > lin.correlation + 0.1]);
+    cases.push([`both beat guessing the common outcome (${(deep.baseline * 100).toFixed(1)}%)`,
+      deep.accuracy > deep.baseline + 0.1 && lin.accuracy > lin.baseline + 0.05]);
+  }
+  {
+    // Reloading the shipped weights must reproduce the reported score, or the
+    // page shows numbers its own model cannot back up.
+    const { MLP } = require('../assets/js/lib/nn.js');
+    const shipped = require('../assets/models/draft-models.js');
+    const spec = shipped.models.find((m) => m.kind === 'deep');
+    const dm = new DraftModel({ roster, kind: 'deep', hp: shipped.hp, seed: shipped.seed });
+    dm.net = MLP.fromJSON(spec.net);
+    const e = dm.evaluate();
+    cases.push([`the shipped weights reproduce the reported loss (${e.loss.toFixed(4)} vs ${spec.loss})`,
+      Math.abs(e.loss - spec.loss) < 2e-3]);
+  }
+  {
+    // Encoding: allies +1, enemies -1, everyone else 0.
+    const v = roster.encode([1, 2], [3]);
+    let ones = 0, negs = 0, zeros = 0;
+    for (const x of v) { if (x === 1) ones++; else if (x === -1) negs++; else zeros++; }
+    cases.push([`the encoding marks allies and enemies (${ones} / ${negs} / ${zeros})`,
+      ones === 2 && negs === 1 && zeros === roster.n - 3]);
+  }
+  {
+    // The page asks the model to rate a pick three picks in. Trained only on
+    // finished five-a-side drafts it reported 98% for almost anything, because
+    // three against four is a shape it had never seen. Half the batch is now
+    // unfinished drafts, and this is the check that it stayed that way.
+    const { MLP } = require('../assets/js/lib/nn.js');
+    const shipped = require('../assets/models/draft-models.js');
+    const spec = shipped.models.find((m) => m.kind === 'deep');
+    const dm = new DraftModel({ roster, kind: 'deep', hp: shipped.hp, seed: shipped.seed });
+    dm.net = MLP.fromJSON(spec.net);
+    const rnd = require('../assets/js/lib/nn.js').mulberry32(4242);
+    const preds = [], truths = [];
+    let extreme = 0;
+    for (let t = 0; t < 400; t++) {
+      const ids = [];
+      while (ids.length < 6) {
+        const c = (rnd() * roster.n) | 0;
+        if (!ids.includes(c)) ids.push(c);
+      }
+      const a = ids.slice(0, 3), b = ids.slice(3);
+      const p = dm.predict(a, b);
+      preds.push(p); truths.push(roster.winProb(a, b));
+      if (p > 0.97 || p < 0.03) extreme++;
+    }
+    const { pearson } = require('../assets/js/lessons/draft-train.js');
+    const r = pearson(preds, truths);
+    cases.push([`it can rate a half-finished draft (3v3 r = ${r.toFixed(2)})`, r > 0.5]);
+    cases.push([`without collapsing to certainty (${(extreme / 4).toFixed(1)}% extreme)`,
+      extreme / preds.length < 0.05]);
+  }
+  {
+    cases.push([`a draft is ${DRAFT.TEAM_SIZE} a side`, DRAFT.TEAM_SIZE === 5]);
+  }
+
+  for (const [name, ok] of cases) {
+    if (!ok) failures++;
+    console.log(`${ok ? '  ok  ' : ' FAIL '} ${('draft  ' + name).padEnd(72)}`);
+  }
+}
+
 console.log(failures === 0
   ? '\nAll checks passed.'
   : `\n${failures} check(s) failed.`);

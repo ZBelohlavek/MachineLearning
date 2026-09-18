@@ -29,8 +29,9 @@ python3 -m http.server 8000     # then open http://localhost:8000
 | **[Learning to be unpredictable](lessons/fighter.html)** | Fight an agent that reads your habits, and one that gives nothing away | Zero-sum games, Nash equilibria, regret matching, exploitability, best response |
 | **[Cooking with a stranger](lessons/kitchen.html)** | Share a kitchen with an agent trained by playing itself | Cooperative multi-agent RL, policy gradients, conventions, why self-play partners fail with people |
 | **[Optimising without a gradient](lessons/factory.html)** | Build a production line, then watch a search beat it | Combinatorial optimisation, simulated annealing, sparse objectives, why the move set matters more than the algorithm |
+| **[Drafting from data](lessons/draft.html)** | Draft a team against a model trained only on who won | Supervised learning on tabular data, interaction terms, overfitting, why accuracy can hide a weak model |
 | **[Rocket League Bot](lessons/rocket-league.html)** | Design the reward function and train a self-play agent to score | Policy gradients, PPO, advantage estimation, reward shaping, self-play |
-| **[Final challenge](lessons/final-challenge.html)** | Pick the right approach for nine situations, then diagnose four training runs from their curves | Judgement: matching method to problem, and reading failure from a chart |
+| **[Final challenge](lessons/final-challenge.html)** | Pick the right approach for ten situations, then diagnose four training runs from their curves | Judgement: matching method to problem, and reading failure from a chart |
 
 The flagship is the last one: a top-down arena where a policy-gradient agent learns to drive, hit the
 ball and score by playing against itself. You choose the reward weights, the opponent and the
@@ -64,6 +65,7 @@ the game and getting better at the machine learning are the same activity:
 | **Ghost time trial** | Evolve a driver | Beat the evolved champion, then your own fastest lap, replayed as a translucent ghost car. Medal times are per course. |
 | **Maze race** | Q-Learning | You and the agent leave the start square together and the shorter route wins. Gold is the shortest path a breadth-first search can find. |
 | **Digit duel** | Train a CNN | Sixty seconds, one called digit at a time, with a multiplier for consecutive hits and a bonus for drawing fast. |
+| **The draft** | Drafting from data | Five picks each against a model that learned the synergies from results. Medals for win streaks. |
 | **The production line** | Optimising without a gradient | Build a factory on a budget and try to beat the annealer. Medals by throughput. |
 | **The shift** | Cooking with a stranger | A two-cook kitchen where the only way to lose is to get in each other's way. Medals for soups served. |
 | **The mixup** | Learning to be unpredictable | A fighting-game exchange with a live meter for how readable you are. Medals for getting ahead of the reader. |

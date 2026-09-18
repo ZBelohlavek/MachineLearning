@@ -339,7 +339,7 @@
               <i>${earned[b.id] ? '★' : '☆'}</i>${earned[b.id] ? b.label : b.hint}</span>`).join('')}
           </div>
           <div class="muted" style="font-size:.82rem;margin-top:10px">
-            ${got === done.length ? 'Both parts complete.' : 'Thirteen decisions, no training, ' + capstone.time + '.'}
+            ${got === done.length ? 'Both parts complete.' : 'Fourteen decisions, no training, ' + capstone.time + '.'}
           </div>
         </a>`;
     }

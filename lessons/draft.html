@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drafting from data · Learn ML by Building</title>
+<meta name="description" content="A League-style champion draft where the synergies are real and hidden. Train a model on match results and check whether it found structure nobody told it about.">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  .pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+  .champ { padding: 8px 9px; border-radius: var(--radius-sm); background: var(--panel-2);
+           border: 1px solid var(--line); color: var(--text); cursor: pointer; text-align: left; }
+  .champ:hover:not(:disabled) { border-color: var(--accent); }
+  .champ:disabled { opacity: .3; cursor: default; }
+  .champ b { display: block; font-size: .8rem; }
+  .champ span { font-size: .66rem; color: var(--text-mute); }
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .team { background: #0d1320; border: 1px solid var(--line); border-radius: 10px; padding: 11px; }
+  .team.you { border-color: rgba(77,163,255,.4); }
+  .team.them { border-color: rgba(255,159,69,.4); }
+  .team h4 { margin: 0 0 8px; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-mute); }
+  .team ol { margin: 0; padding-left: 18px; font-size: .84rem; color: var(--text); }
+  .team li.empty { color: var(--text-mute); list-style: none; margin-left: -18px; }
+  .odds { height: 22px; border-radius: 11px; background: var(--line-soft); overflow: hidden; position: relative; margin-top: 10px; }
+  .odds i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #6fd3ff); transition: width .35s ease; }
+  .odds span { position: absolute; inset: 0; display: grid; place-items: center;
+               font-family: var(--mono); font-size: .76rem; font-weight: 700;
+               color: #eaf1ff; text-shadow: 0 1px 3px rgba(2, 8, 18, .85); }
+  .cmp4 { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .cmp4 th { text-align: left; color: var(--text-mute); font-weight: 500; font-size: .74rem;
+             text-transform: uppercase; letter-spacing: .07em; padding: 7px 8px; }
+  .cmp4 td { padding: 8px; border-bottom: 1px solid var(--line-soft); }
+  .cmp4 td.n { font-family: var(--mono); text-align: right; color: var(--text); }
+  .cmp4 tr.better td.n { color: var(--good); }
+  #draft-chart, #calib { width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #0a0f19; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lesson-head">
+    <div class="kicker">Supervised learning · tabular data</div>
+    <h1>Drafting from data</h1>
+    <p class="lead">
+      Twenty-four champions, each with a strength, a handful of team-mates they work well with, and
+      a handful of opponents they beat. None of that is written down anywhere the model can see. It
+      gets ten picks and a win or a loss, twenty thousand times, and has to work the rest out — and
+      because I wrote the hidden numbers myself, this is the one lesson here where you can mark its
+      homework.
+    </p>
+  </div>
+
+  <div id="lesson-goals"></div>
+
+  <div class="section">
+    <h2>Draft against it</h2>
+    <p>
+      You pick, it picks, five each. It chooses whatever its model says raises its win probability
+      most — and its model is only what it learned from match results. When both teams are full,
+      the real simulator decides, using the hidden numbers neither of you was shown.
+    </p>
+
+    <div class="split">
+      <div class="panel game-panel" id="game-panel">
+        <div class="panel-title">
+          <h3><span class="game-tag">game</span> The draft</h3>
+          <span class="hint" id="draft-note">your pick</span>
+        </div>
+        <div class="teams">
+          <div class="team you"><h4>You</h4><ol id="team-a"></ol></div>
+          <div class="team them"><h4>The model</h4><ol id="team-b"></ol></div>
+        </div>
+        <div class="odds"><i id="odds-bar"></i><span id="odds-text">pick to begin</span></div>
+        <div id="d-hud"></div>
+        <div class="pool" style="margin-top:12px" id="pool"></div>
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-new" class="primary">New draft</button>
+          <button id="btn-auto">Let it draft for me</button>
+          <span id="d-sound"></span>
+        </div>
+        <div id="d-result" class="result-line"></div>
+        <div class="medal-track" id="d-medals"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><h3>What it thinks</h3><span class="hint">its own model, not the truth</span></div>
+        <div id="think-list"></div>
+        <p class="muted" style="font-size:.8rem;margin:12px 0 0">
+          Its top few remaining picks, with the win probability it expects from each. These are
+          beliefs, not facts: it can be confidently wrong, and the bar above shows what the real
+          simulator makes of the same teams. Half of what it trained on was unfinished drafts,
+          labelled with how the match ended — train only on completed five-a-side teams and it will
+          cheerfully rate a third pick at 98%, because three against four is a shape it has never
+          been shown.
+        </p>
+        <div class="panel-title" style="margin-top:20px"><h3>Model</h3></div>
+        <div id="model-mode"></div>
+        <p class="muted" style="font-size:.82rem;margin-top:10px" id="model-note"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>One weight per champion is not enough</h2>
+    <p>
+      The obvious model gives every champion a number and adds them up: positive for your team,
+      negative for theirs. It is fast, it is interpretable, and it cannot express the one thing this
+      data is actually made of. "These two are strong together" has nowhere to live when each
+      champion owns exactly one weight, independent of who else is picked.
+    </p>
+    <p>
+      A hidden layer can represent that, because a hidden unit can respond to combinations. So the
+      comparison below is not really about model size. It is about whether the shape of the model
+      can hold the shape of the truth.
+    </p>
+    <div class="panel">
+      <table class="cmp4" id="model-table"><tbody></tbody></table>
+      <p class="muted" style="font-size:.84rem;margin:14px 0 0" id="model-table-note"></p>
+    </div>
+    <p style="margin-top:16px">
+      Accuracy is the least interesting column. Both models get a good share of winners right,
+      because plenty of matches are decided by one team simply having stronger champions. The column
+      that matters is the last one: how closely the predicted probability tracks the real one. That
+      is only measurable because the real one exists, and on almost every real problem it does not.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Did it actually find the synergies?</h2>
+    <p>
+      Marking the homework. Asking "does it rate the good pairs highly" turns out not to settle
+      anything: both models do, because a champion who appears in a lot of synergy pairs simply wins
+      more often, and a single weight is perfectly capable of absorbing that. The question has to be
+      sharper.
+    </p>
+    <p>
+      So measure the interaction directly, the way you would in an experiment. Hold the rest of both
+      teams fixed and take a difference of differences: the prediction with both champions, minus
+      the prediction with only the first, minus the prediction with only the second, plus the
+      prediction with neither. Everything that depends on one champion alone cancels. What is left
+      is the part of the prediction that needs both at once.
+    </p>
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>Measured interaction</h3><span class="hint">pairs it was never told about</span></div>
+        <div id="synergy-readout"></div>
+        <p class="muted" style="font-size:.82rem;margin:12px 0 0">
+          For the linear model this is not small, it is zero — the terms cancel algebraically, no
+          matter what it learned. The network reports a clear positive interaction for the real
+          pairs and a negative one for the rest, from nothing but which teams happened to win.
+        </p>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Predicted against actual</h3><span class="hint" id="calib-hint"></span></div>
+        <canvas id="calib" role="img" aria-label="Predicted win probability against the true win probability for held-out matches."></canvas>
+        <div id="calib-pills" style="margin-top:10px"></div>
+        <p class="muted" style="font-size:.82rem;margin:12px 0 0">
+          Every held-out match: the model's guess across, the truth up. A perfect model puts
+          everything on the diagonal. The linear model makes a fat cloud; the network pulls it
+          towards the line without ever reaching it, because some of the variation is luck that
+          nothing could predict.
+        </p>
+      </div>
+    </div>
+    <p style="margin-top:16px">
+      The last number is the one I would show a sceptic. Across every pair, the size of the
+      interaction the network reports tracks the size of the real one — not perfectly, but far too
+      well for chance. It rebuilt a piece of the rulebook from results alone.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Two ways to stop it memorising</h2>
+    <p>
+      Capacity is not free. It is a bet that you have enough data to pay for it, and on six thousand
+      matches the bet fails outright. Here is the same network on six thousand, with only the
+      regularisation changed:
+    </p>
+    <div class="panel">
+      <table class="cmp4" id="reg-table"><tbody>
+        <tr><th></th><th>best held out</th><th>where it ended</th><th>training loss</th></tr>
+        <tr><td>finished drafts only, weight decay 1e-4</td><td class="n">0.622</td><td class="n" style="color:var(--bad)">2.443</td><td class="n">0.101</td></tr>
+        <tr><td>finished drafts only, weight decay 1e-3</td><td class="n">0.622</td><td class="n">0.797</td><td class="n">0.266</td></tr>
+        <tr><td>unfinished drafts too, weight decay 1e-4</td><td class="n">0.622</td><td class="n">0.882</td><td class="n">–</td></tr>
+        <tr class="better"><td>unfinished drafts too, weight decay 1e-3</td><td class="n">0.596</td><td class="n">0.598</td><td class="n">–</td></tr>
+      </tbody></table>
+      <p class="muted" style="font-size:.84rem;margin:14px 0 0">
+        Forty thousand steps each, same seed, same six thousand matches, scored on the same held-out
+        set. The linear model on this data lands at 0.618.
+      </p>
+    </div>
+    <p style="margin-top:16px">
+      Read the top row carefully. The training loss is 0.101 and the held-out loss is 2.443 — it has
+      not failed to learn, it has learned the wrong thing extremely well. It knows which exact
+      compositions won and has nothing to say about any other. The best held-out score in that run
+      happened at step 2,000 and every step after it made things worse.
+    </p>
+    <p>
+      The two fixes are different in kind. Weight decay pushes back on the model. Training on
+      unfinished drafts instead adds data — the same matches, seen at every stage of the draft —
+      and it was the bigger of the two, which I did not expect, since I added it to fix something
+      else entirely. That is the ordinary shape of this work: the thing you change for one reason
+      turns out to matter for another, and you only find out because you measured.
+    </p>
+    <p>
+      Either way, six thousand matches leaves the network barely ahead of the model with one weight
+      per champion. Twenty thousand is where the gap opens. Turn the settings down below and watch
+      the held-out curve peel away from the training curve.
+    </p>
+    <div class="split">
+      <div class="panel">
+        <div class="panel-title"><h3>Train one yourself</h3></div>
+        <div id="train-stats"></div>
+        <div class="controls" style="margin-top:14px">
+          <button id="btn-train" class="primary">▶ Train</button>
+          <button id="btn-train-reset" class="danger">Start over</button>
+        </div>
+        <div id="run-bar"></div>
+        <canvas id="draft-chart" class="fit" style="margin-top:14px" role="img" aria-label="Training and held-out loss against training steps."></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Settings</h3></div>
+        <div id="draft-hp"></div>
+        <div class="note warn" style="margin-top:14px">
+          <b class="label">Watch the two curves separate</b>
+          <p class="mb0">Blue is the loss on matches it has seen, orange the loss on matches it has
+          not. While they fall together, it is learning. The moment orange turns upward while blue
+          keeps falling, everything after that point is memorisation.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Experiments worth running</h2>
+    <ul>
+      <li><b>Draft with the linear model as your opponent.</b> It picks strong champions and ignores
+        who they are playing next to, which is beatable once you notice.</li>
+      <li><b>Pick a known counter deliberately.</b> Look at what the model expects, then pick
+        against its last champion. Watch the real odds bar move differently from its prediction.</li>
+      <li><b>Drop to six thousand matches, turn off unfinished drafts, and set weight decay to
+        1e-4.</b> That is the top row of the table, and you can watch the orange curve turn.</li>
+      <li><b>Then put weight decay back to 1e-3 without touching anything else.</b> Same data, same
+        architecture, and the curve stops turning.</li>
+      <li><b>Compare accuracy with correlation.</b> Accuracy barely separates the two models;
+        correlation with the true probability separates them clearly. Pick your metric carefully.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Check yourself</h2>
+    <p>
+      Three questions on the draft you just played. You can't fail this — the explanation appears
+      either way, and the wrong answers are the ones worth reading.
+    </p>
+    <div class="panel" id="quiz"></div>
+  </div>
+
+  <div id="next-links"></div>
+</div>
+
+<script src="../assets/js/lib/nn.js"></script>
+<script src="../assets/js/lib/plot.js"></script>
+<script src="../assets/js/lib/ui.js"></script>
+<script src="../assets/js/lib/arcade.js"></script>
+<script src="../assets/js/lib/quizzes.js"></script>
+<script src="../assets/models/draft-models.js"></script>
+<script src="../assets/js/lessons/draft-env.js"></script>
+<script src="../assets/js/lessons/draft-train.js"></script>
+<script src="../assets/js/lessons/draft.js"></script>
+</body>
+</html>
