@@ -577,6 +577,106 @@ for (const cfg of [
   }
 }
 
+/* ------------------------------------------------- game theory + regret
+   The claims this lesson makes are strong and checkable: the game is zero-sum,
+   the equilibrium is unexploitable, and being unexploitable earns nothing. */
+{
+  const { GT } = require('../assets/js/lib/gametheory.js');
+  const cases = [];
+  const N = GT.N;
+
+  {
+    let anti = true;
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      if (GT.PAYOFF[i][j] !== -GT.PAYOFF[j][i]) anti = false;
+    }
+    cases.push(['the game is zero-sum (payoffs antisymmetric)', anti]);
+  }
+  {
+    // No action may dominate another, or the game has no mixture to find.
+    let dominated = false;
+    for (let i = 0; i < N; i++) for (let k = 0; k < N; k++) {
+      if (i === k) continue;
+      let alwaysBetter = true;
+      for (let j = 0; j < N; j++) if (GT.PAYOFF[i][j] <= GT.PAYOFF[k][j]) alwaysBetter = false;
+      if (alwaysBetter) dominated = true;
+    }
+    cases.push(['no move beats another whatever the opponent does', !dominated]);
+  }
+
+  const eq = GT.solve(120000);
+  cases.push([`equilibrium is unexploitable (${eq.exploitability.toFixed(4)} per round)`,
+    Math.abs(eq.exploitability) < 0.05]);
+  cases.push(['equilibrium uses every option', eq.mix.every((p) => p > 0.02)]);
+  {
+    // The rarest option should be the throw: it loses to both strikes and only
+    // beats blocks. If that ever stops being true the payoffs have drifted.
+    let rarest = 0;
+    for (let i = 1; i < N; i++) if (eq.mix[i] < eq.mix[rarest]) rarest = i;
+    cases.push([`the throw is the rarest option at equilibrium (${(eq.mix[2] * 100).toFixed(1)}%)`,
+      GT.ACTIONS[rarest].id === 'throw']);
+  }
+
+  {
+    // Unexploitable means it earns nothing from anyone, including a sucker.
+    const habit = new Float64Array(N);
+    habit[3] = 0.55; habit[0] = 0.15; habit[1] = 0.15; habit[2] = 0.1; habit[4] = 0.05;
+    const v = GT.value(eq.mix, habit);
+    cases.push([`equilibrium earns nothing even against a habit (${v.toFixed(3)} per round)`,
+      Math.abs(v) < 0.06]);
+    // …while a perfect reader takes real money off that same habit.
+    const br = GT.bestResponse(habit);
+    cases.push([`a best response does punish that habit (+${br.value.toFixed(2)} per round)`,
+      br.value > 0.5]);
+  }
+
+  {
+    // A pure strategy is always exploitable; that is what makes mixing necessary.
+    let allPunishable = true;
+    for (let i = 0; i < N; i++) {
+      const pure = new Float64Array(N);
+      pure[i] = 1;
+      if (GT.exploitability(pure) <= 0) allPunishable = false;
+    }
+    cases.push(['every single fixed move can be punished', allPunishable]);
+  }
+
+  {
+    // Regret matching must beat a fixed opponent, which is the other half of
+    // the lesson: against something that does not adapt, adapting pays.
+    const rm = new GT.RegretMatcher();
+    let total = 0;
+    const fixed = 3;
+    for (let t = 0; t < 4000; t++) {
+      const a = rm.act();
+      total += GT.PAYOFF[a.action][fixed];
+      rm.observe(a.action, fixed);
+    }
+    cases.push([`regret matching learns to punish a fixed opponent (+${(total / 4000).toFixed(2)} per round)`,
+      total / 4000 > 1]);
+  }
+
+  {
+    // The running average must be less exploitable than the current mixture:
+    // this is the point the lesson makes, so it should be measured.
+    const a = new GT.RegretMatcher(), b = new GT.RegretMatcher();
+    for (let t = 0; t < 40000; t++) {
+      const x = a.act(), y = b.act();
+      a.observe(x.action, y.action);
+      b.observe(y.action, x.action);
+    }
+    const curE = GT.exploitability(a.strategy());
+    const avgE = GT.exploitability(a.average());
+    cases.push([`the average is less exploitable than the current mixture (${avgE.toFixed(3)} vs ${curE.toFixed(2)})`,
+      avgE < curE && avgE < 0.08]);
+  }
+
+  for (const [name, ok] of cases) {
+    if (!ok) failures++;
+    console.log(`${ok ? '  ok  ' : ' FAIL '} ${('fighter  ' + name).padEnd(72)}`);
+  }
+}
+
 console.log(failures === 0
   ? '\nAll checks passed.'
   : `\n${failures} check(s) failed.`);

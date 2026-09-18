@@ -656,6 +656,44 @@ const check = (name, ok, extra='') => { (ok ? pass++ : fail++); console.log(`${o
     await page.close();
   }
 
+  /* ---- the fighting game: reading habits vs giving nothing away ---- */
+  {
+    const page = await open('lessons/fighter.html');
+    await page.waitForTimeout(1000);
+    check('fighter · five moves and a full payoff table',
+          (await page.locator('#moves .move').count()) === 5 &&
+          (await page.locator('#payoff-table td').count()) === 25);
+
+    // Spamming one move must be punished by the reader.
+    await page.evaluate(() => window.__fighter.setMode('reader'));
+    await page.evaluate(() => { for (let i = 0; i < 60; i++) window.__fighter.play(3); });
+    const vsReader = await page.evaluate(() => window.__fighter.score / window.__fighter.round);
+    check('fighter · the reader punishes a habit', vsReader < -0.8,
+          `(${vsReader.toFixed(2)} per round to you)`);
+    check('fighter · and your exploitability is visible',
+          /\+\d/.test(await page.textContent('#exp-val')),
+          '→ ' + (await page.textContent('#exp-val')));
+
+    // The same spam against the equilibrium agent must be roughly even: it is
+    // unexploitable, which also means it never punishes anyone.
+    await page.click('#btn-reset');
+    await page.evaluate(() => window.__fighter.setMode('nash'));
+    await page.evaluate(() => { for (let i = 0; i < 500; i++) window.__fighter.play(3); });
+    const vsNash = await page.evaluate(() => window.__fighter.score / window.__fighter.round);
+    check('fighter · the equilibrium agent neither punishes nor loses', Math.abs(vsNash) < 0.25,
+          `(${vsNash.toFixed(3)} per round over 500 rounds)`);
+
+    // Self-play must drive the running average towards unexploitable.
+    await page.evaluate(() => { for (let i = 0; i < 40; i++) window.__fighter.convStep(500); });
+    const conv = await page.evaluate(() => ({
+      rounds: window.__fighter.convRounds,
+      exp: window.__fighter.GT.exploitability(window.__fighter.convAverage),
+    }));
+    check('fighter · self-play converges to an unexploitable average', conv.exp < 0.1,
+          `(${conv.exp.toFixed(3)} after ${conv.rounds.toLocaleString()} rounds)`);
+    await page.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'no page errors anywhere');
   await browser.close();

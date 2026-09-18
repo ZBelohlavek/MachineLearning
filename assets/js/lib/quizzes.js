@@ -332,6 +332,45 @@
         },
       ],
     },
+    fighter: {
+      id: 'fighter', badge: 'quiz-fighter',
+      title: 'Check yourself \u00b7 game theory',
+      questions: [
+        {
+          q: 'The equilibrium agent plays someone who blocks high almost half the time. Over four thousand rounds it earns almost exactly nothing. Why does it not punish the habit?',
+          options: [
+            'It has not trained for long enough',
+            'Punishing means leaving equilibrium, which would make it exploitable in turn',
+            'Blocking high is already the strongest move',
+            'It cannot see what the opponent played',
+          ],
+          answer: 1,
+          why: 'Unexploitable and winning are different goals. The equilibrium mixture guarantees that nothing you do can take money off it, and the price of that guarantee is that it takes nothing off you either. To punish a habit it would have to lean towards one answer, and the moment it leans, a reply exists that beats it. Poker programs accept this trade on purpose; human professionals usually do not.',
+        },
+        {
+          q: 'Regret matching keeps two things: the mixture implied by current regrets, and the running average of every mixture it has played. Which one is the answer, and why?',
+          options: [
+            'The current mixture, because it reflects the most recent information',
+            'The running average, because that is what converges to unexploitable',
+            'Either, since they end up the same',
+            'Neither \u2014 it plays the single action with the highest regret',
+          ],
+          answer: 1,
+          why: 'This is the part that catches everyone. The current mixture keeps swinging and is often badly exploitable on its own, which you can watch on the orange line in the self-play chart: it never settles. The guarantee in the theorem is about the average, so the agent samples from the average. Reading the current mixture as the strategy is the most common way to implement this algorithm wrongly.',
+        },
+        {
+          q: 'You beat the reader by establishing a habit for ten rounds and then switching. What does that tell you about best-response agents?',
+          options: [
+            'That the reader was badly implemented',
+            'That any agent committing to a single best answer is itself exploitable',
+            'That ten rounds is too short a memory',
+            'That exploitative play never works',
+          ],
+          answer: 1,
+          why: 'A best response is a pure strategy, and a pure strategy always has something that beats it \u2014 that is the same fact that makes the game a game in the first place. The reader takes real money off anyone predictable and hands it straight back to anyone who notices what it has settled on. Fighting-game players call the setup and switch "conditioning"; it works on people for exactly the same reason.',
+        },
+      ],
+    },
     racer: {
       id: 'racer', badge: 'quiz-racer',
       title: 'Check yourself · evolution',
